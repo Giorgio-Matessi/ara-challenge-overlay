@@ -74,17 +74,27 @@ row. The tests will catch out-of-order times and duplicate track+car pairs at bu
 
 ## Changing the icon
 
-`src/AraOverlay/AraOverlay.ico` is both the exe icon and the tray icon. To use a PNG instead:
+`src/AraOverlay/AraOverlay.ico` is both the exe icon and the tray icon, built from
+`icon-source.png` (the ARA mark) by:
 
 ```bash
-python3 tools/png_to_ico.py your-logo.png src/AraOverlay/AraOverlay.ico
+python3 tools/png_to_ico.py src/AraOverlay/icon-source.png src/AraOverlay/AraOverlay.ico --bg 10181C
+```
+
+`--bg` composites onto a rounded tile in the overlay's panel colour. Drop it for a transparent
+icon — that looks cleaner on a dark taskbar but washes out on a light one, which is why the
+tile is the default. To use different art, point the same command at your own PNG:
+
+```bash
+python3 tools/png_to_ico.py your-logo.png src/AraOverlay/AraOverlay.ico --bg 10181C
 ```
 
 then rebuild. The script needs nothing installed, and writes the tray sizes as classic DIB
 frames because `System.Drawing.Icon` reads PNG-compressed frames unreliably.
 
-Feed it a **square** PNG — anything else gets squashed, so crop first. Detail disappears at
-16x16, which is the size the tray actually draws, so a simple shape beats a detailed logo.
+Non-square art is trimmed to its visible bounds and centred on a square canvas, so nothing is
+squashed. Detail still disappears at 16x16, which is the size the tray actually draws, so a
+simple shape beats a detailed logo.
 
 ## Building
 

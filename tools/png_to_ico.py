@@ -3,6 +3,10 @@
 Convert a PNG into a Windows .ico for the overlay.
 
     python3 tools/png_to_ico.py logo.png src/AraOverlay/AraOverlay.ico
+    python3 tools/png_to_ico.py logo.png out.ico --bg 10181C   # on a rounded tile
+
+Non-square art is trimmed to its visible bounds and centred on a square canvas,
+never squashed.
 
 Writes the tray sizes as classic DIB frames, because System.Drawing.Icon reads
 PNG-compressed frames unreliably, plus a 256px PNG frame for Explorer.
@@ -77,6 +81,39 @@ def read_png(path):
     return w, h, rows
 
 
+def square(rows, w, h, margin=0.06):
+    """Trim to the visible bounds, then centre on a square canvas with a little air."""
+    xs = [x for y in range(h) for x in range(w) if rows[y][x][3] > 8]
+    ys = [y for y in range(h) for x in range(w) if rows[y][x][3] > 8]
+    if not xs:
+        return rows, w, h
+    x0, x1, y0, y1 = min(xs), max(xs) + 1, min(ys), max(ys) + 1
+
+    side = int(max(x1 - x0, y1 - y0) * (1 + margin * 2))
+    ox, oy = (side - (x1 - x0)) // 2, (side - (y1 - y0)) // 2
+
+    out = [[(0, 0, 0, 0)] * side for _ in range(side)]
+    for y in range(y0, y1):
+        for x in range(x0, x1):
+            out[oy + y - y0][ox + x - x0] = rows[y][x]
+    return out, side, side
+
+
+def tile(rows, n, rgb):
+    """Composite onto an opaque rounded square, so the icon reads on a light taskbar too."""
+    r = n * 0.22
+    for y in range(n):
+        for x in range(n):
+            cx, cy = min(x + 0.5, n - x - 0.5), min(y + 0.5, n - y - 0.5)
+            if cx < r and cy < r and (r - cx) ** 2 + (r - cy) ** 2 > r * r:
+                rows[y][x] = (0, 0, 0, 0)
+                continue
+            fg = rows[y][x]
+            a = fg[3] / 255
+            rows[y][x] = tuple(int(fg[i] * a + rgb[i] * (1 - a)) for i in range(3)) + (255,)
+    return rows
+
+
 def resize(rows, w, h, n):
     """Box-filter to n x n. Averaging keeps small sizes legible; nearest does not."""
     out = []
@@ -115,14 +152,16 @@ def png(px):
             + chunk(b"IEND", b""))
 
 
-def main(src, dst):
+def main(src, dst, bg=None):
     w, h, rows = read_png(src)
-    if w != h:
-        print(f"note: {src} is {w}x{h}. Icons are square, so it will be squashed — "
-              "crop it square first for a better result.")
+    rows, w, h = square(rows, w, h)
 
-    frames = [(s, dib(resize(rows, w, h, s))) for s in (16, 24, 32, 48, 64)]
-    frames.append((256, png(resize(rows, w, h, 256))))
+    def frame(n):
+        px = resize(rows, w, h, n)
+        return tile(px, n, bg) if bg else px
+
+    frames = [(s, dib(frame(s))) for s in (16, 24, 32, 48, 64)]
+    frames.append((256, png(frame(256))))
 
     out = struct.pack("<HHH", 0, 1, len(frames))
     offset = 6 + 16 * len(frames)
@@ -136,6 +175,13 @@ def main(src, dst):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
+    args = sys.argv[1:]
+    bg = None
+    if "--bg" in args:
+        i = args.index("--bg")
+        hexed = args[i + 1].lstrip("#")
+        bg = tuple(int(hexed[j:j + 2], 16) for j in (0, 2, 4))
+        del args[i:i + 2]
+    if len(args) != 2:
         raise SystemExit(__doc__)
-    main(sys.argv[1], sys.argv[2])
+    main(args[0], args[1], bg)
