@@ -9,6 +9,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>AraChallengeOverlay</AssemblyName>
     <RootNamespace>AraOverlay</RootNamespace>
+
+    <!-- Publish settings, so a league member gets one file and nothing to install.
+         WPF pulls in native DLLs (PresentationNative, wpfgfx, vcruntime140, D3DCompiler,
+         PenImc) that PublishSingleFile leaves loose beside the exe unless this is set. -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <DebugType>none</DebugType>
   </PropertyGroup>
 
   <ItemGroup>

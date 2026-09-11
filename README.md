@@ -74,8 +74,7 @@ row. The tests will catch out-of-order times and duplicate track+car pairs at bu
 ```bash
 dotnet test tests/AraOverlay.Core.Tests          # logic only — runs on any OS
 dotnet build src/AraOverlay                      # Windows only (WPF)
-dotnet publish src/AraOverlay -c Release -r win-x64 \
-    --self-contained -p:PublishSingleFile=true   # one exe for the league
+dotnet publish src/AraOverlay -c Release -r win-x64 --self-contained  # one exe for the league
 ```
 
 `AraOverlay.Core` holds every decision worth getting right — time parsing, challenge matching,
