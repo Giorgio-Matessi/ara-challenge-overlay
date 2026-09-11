@@ -25,6 +25,12 @@ public sealed class Challenge
     /// <summary>iRacing's DriverInfo:Drivers:CarPath, e.g. "mx5 mx52016" — not the display name.</summary>
     public string CarId { get; init; } = "";
 
+    /// <summary>
+    /// True for the wet-weather challenges. Track and car alone don't identify a challenge:
+    /// #14 and #19 are the same car on the same Le Mans layout, dry and wet.
+    /// </summary>
+    public bool Wet { get; init; }
+
     public string Gold { get; init; } = "";
     public string Silver { get; init; } = "";
     public string Bronze { get; init; } = "";

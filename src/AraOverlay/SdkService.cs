@@ -13,6 +13,7 @@ public sealed class SdkService : IDisposable
 {
     private readonly IRacingSdk _sdk = new();
     private readonly LapTracker _tracker = new();
+    private readonly ConditionTracker _conditions = new();
     private readonly ChallengeCatalog _catalog = ChallengeCatalog.Embedded;
 
     /// <summary>True while iRacing is running and handing us telemetry.</summary>
@@ -22,7 +23,10 @@ public sealed class SdkService : IDisposable
     public string TrackId { get; private set; } = "";
     public string CarId { get; private set; } = "";
 
-    /// <summary>The challenge for this track+car, or null if the driver isn't on one.</summary>
+    /// <summary>True when the session counts as wet — challenges 16-20 need this to match.</summary>
+    public bool IsWet => _conditions.IsWet;
+
+    /// <summary>The challenge for this track, car and conditions, or null if there isn't one.</summary>
     public Challenge? Challenge { get; private set; }
 
     public event Action? StateChanged;
@@ -56,6 +60,7 @@ public sealed class SdkService : IDisposable
         Challenge = null;
         TrackId = CarId = "";
         _tracker.Reset();
+        _conditions.Reset();
         StateChanged?.Invoke();
     }
 
@@ -79,8 +84,17 @@ public sealed class SdkService : IDisposable
 
         TrackId = track;
         CarId = car;
-        Challenge = _catalog.Find(track, car);
         _tracker.Reset();
+        Rematch();
+    }
+
+    /// <summary>
+    /// Re-runs the lookup. Called on a session change and whenever the track flips between wet
+    /// and dry, since conditions are part of what identifies a challenge.
+    /// </summary>
+    private void Rematch()
+    {
+        Challenge = _catalog.Find(TrackId, CarId, _conditions.IsWet);
         StateChanged?.Invoke();
     }
 
@@ -88,6 +102,8 @@ public sealed class SdkService : IDisposable
     {
         TelemetryFrame frame;
         double currentLap;
+        int wetness;
+        bool declaredWet;
         try
         {
             frame = new TelemetryFrame(
@@ -98,12 +114,16 @@ public sealed class SdkService : IDisposable
                 OnPitRoad: _sdk.Data.GetBool("OnPitRoad"));
 
             currentLap = _sdk.Data.GetFloat("LapCurrentLapTime");
+            wetness = _sdk.Data.GetInt("TrackWetness");
+            declaredWet = _sdk.Data.GetBool("WeatherDeclaredWet");
         }
         catch (Exception)
         {
             // Telemetry can be mid-swap between sessions; skip the frame rather than die.
             return;
         }
+
+        if (_conditions.Update(wetness, declaredWet)) Rematch();
 
         var completed = _tracker.Update(frame);
 
