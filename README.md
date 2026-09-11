@@ -1,1 +1,80 @@
-# ara-challenge-overlay
+# ARA Challenge Overlay
+
+An iRacing overlay for the **Almeida Racing Academy** 20-challenge series. It watches the sim,
+works out which challenge you've loaded from the track and car, shows the Bronze / Silver / Gold
+target times, and pops a banner the moment you set a clean lap quick enough to earn a medal.
+
+## Requirements
+
+- Windows 10/11, [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0)
+  (not needed if you grabbed the self-contained release).
+- **iRacing must run windowed-borderless, not exclusive fullscreen.** Windows gives an
+  exclusive-fullscreen game the whole screen and nothing may draw on top of it. Every sim
+  overlay has this limitation; the only workarounds involve hooking the sim's renderer, which
+  is not something to point at an anti-cheat.
+- The first launch shows a Windows SmartScreen warning, because the exe isn't code-signed:
+  **More info → Run anyway**.
+
+## Using it
+
+Run `AraChallengeOverlay.exe` and leave it running — it lives in the system tray and stays
+invisible until iRacing is up.
+
+- On a challenge's track+car: the three target times, a ✓ on every medal you already hold, your
+  live lap time and how far the last lap sat from the next tier up.
+- On anything else: the track and car ids the sim reported, so you can check them against
+  `challenges.json`.
+
+Right-click the tray icon for:
+
+| | |
+|---|---|
+| **Lock position (click-through)** | On by default. Unlock to drag the overlay somewhere else; lock again so the mouse passes through to the sim. |
+| **Copy current track/car ID** | Puts the sim's real ids on the clipboard, ready to paste into `challenges.json`. |
+| **Exit** | |
+
+A lap is only worth a medal if it's **clean**. Leaving the track surface, picking up incident
+points, or touching pit lane invalidates the lap, and the overlay says which one did it.
+
+Your best time and best medal per challenge live in
+`%APPDATA%\AraOverlay\progress.json`; window position and lock state in `settings.json` beside it.
+The banner only fires when you *improve* a tier, so a second gold lap won't interrupt you again.
+
+## The challenge list
+
+`src/AraOverlay.Core/challenges.json` is embedded into the exe at build time. Each row is keyed
+on iRacing's **internal ids**, not the display names:
+
+```json
+{
+  "number": 1,
+  "name": "Lime Rock Park — Global Mazda MX-5 Cup",
+  "trackId": "limerock full",     // WeekendInfo:TrackName
+  "carId":   "mx5 mx52016",       // DriverInfo:CarPath
+  "gold":    "0:53.500",
+  "silver":  "0:54.200",
+  "bronze":  "0:55.000"
+}
+```
+
+Those ids aren't reliably guessable from a track or car name, so if a challenge never lights up:
+load it in the sim, use the tray's **Copy current track/car ID**, and paste the result over the
+row. The tests will catch out-of-order times and duplicate track+car pairs at build time.
+
+## Building
+
+```bash
+dotnet test tests/AraOverlay.Core.Tests          # logic only — runs on any OS
+dotnet build src/AraOverlay                      # Windows only (WPF)
+dotnet publish src/AraOverlay -c Release -r win-x64 \
+    --self-contained -p:PublishSingleFile=true   # one exe for the league
+```
+
+`AraOverlay.Core` holds every decision worth getting right — time parsing, challenge matching,
+medal thresholds, lap validity, progress — and has no UI or SDK dependency, so it's covered by
+tests that run anywhere. `src/AraOverlay` is the WPF shell and `SdkService.cs` is the only file
+that touches iRacing.
+
+## Licence
+
+GPL-3.0, inherited from [IRSDKSharper](https://github.com/mherbold/IRSDKSharper).

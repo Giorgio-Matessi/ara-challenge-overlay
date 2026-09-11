@@ -1,0 +1,28 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AraOverlay.Core", "src\AraOverlay.Core\AraOverlay.Core.csproj", "{90B0A017-C7CF-40FF-AC7F-98296327BF8E}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AraOverlay", "src\AraOverlay\AraOverlay.csproj", "{CF063640-F9EA-4C6A-AB4E-53B09A72AFC4}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AraOverlay.Core.Tests", "tests\AraOverlay.Core.Tests\AraOverlay.Core.Tests.csproj", "{809EBD1D-3121-4DE1-862B-43B68ADA4E92}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{90B0A017-C7CF-40FF-AC7F-98296327BF8E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{90B0A017-C7CF-40FF-AC7F-98296327BF8E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{90B0A017-C7CF-40FF-AC7F-98296327BF8E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{90B0A017-C7CF-40FF-AC7F-98296327BF8E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CF063640-F9EA-4C6A-AB4E-53B09A72AFC4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CF063640-F9EA-4C6A-AB4E-53B09A72AFC4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CF063640-F9EA-4C6A-AB4E-53B09A72AFC4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CF063640-F9EA-4C6A-AB4E-53B09A72AFC4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{809EBD1D-3121-4DE1-862B-43B68ADA4E92}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{809EBD1D-3121-4DE1-862B-43B68ADA4E92}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{809EBD1D-3121-4DE1-862B-43B68ADA4E92}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{809EBD1D-3121-4DE1-862B-43B68ADA4E92}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

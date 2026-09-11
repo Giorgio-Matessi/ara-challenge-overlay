@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>AraChallengeOverlay</AssemblyName>
+    <RootNamespace>AraOverlay</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="IRSDKSharper" Version="1.1.9" />
+    <ProjectReference Include="..\AraOverlay.Core\AraOverlay.Core.csproj" />
+  </ItemGroup>
+
+</Project>
