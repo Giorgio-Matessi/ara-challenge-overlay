@@ -17,6 +17,9 @@ target times, and pops a banner the moment you set a clean lap quick enough to e
 
 ## Using it
 
+Only one copy runs at a time — starting a second says so and exits, since two overlays would
+stack on screen and fight over the progress file.
+
 Run `AraChallengeOverlay.exe` and leave it running — it lives in the system tray and stays
 invisible until iRacing is up.
 
