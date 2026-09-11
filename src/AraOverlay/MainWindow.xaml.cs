@@ -141,8 +141,8 @@ public partial class MainWindow : Window
         try
         {
             Clipboard.SetText(
-                $"\"trackId\": \"{_sdk.TrackId}\",\n" +
-                $"\"carId\": \"{_sdk.CarId}\",\n" +
+                $"\"trackId\": {_sdk.TrackId},   // {_sdk.TrackName}\n" +
+                $"\"carId\": {_sdk.CarId},   // {_sdk.CarName}\n" +
                 (_sdk.IsWet ? "\"wet\": true,\n" : ""));
         }
         catch (COMException)
@@ -181,7 +181,9 @@ public partial class MainWindow : Window
             TitleText.Text = "No ARA challenge for this combination";
             Targets.Visibility = Visibility.Collapsed;
             // Conditions are shown too: a wet challenge simply won't match in the dry.
-            StatusText.Text = $"track  {_sdk.TrackId}\ncar    {_sdk.CarId}\ncond   {(_sdk.IsWet ? "wet" : "dry")}";
+            StatusText.Text = $"track  {_sdk.TrackId}  {_sdk.TrackName}\n" +
+                              $"car    {_sdk.CarId}  {_sdk.CarName}\n" +
+                              $"cond   {(_sdk.IsWet ? "wet" : "dry")}";
         }
     }
 

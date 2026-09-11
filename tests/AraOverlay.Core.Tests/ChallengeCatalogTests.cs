@@ -6,9 +6,9 @@ public class ChallengeCatalogTests
 {
     private const string TwoRows = """
     [
-      { "number": 1, "name": "A", "trackId": "limerock full", "carId": "mx5 mx52016",
+      { "number": 1, "name": "A", "trackId": 299, "carId": 142,
         "gold": "0:53.500", "silver": "0:54.200", "bronze": "0:55.000" },
-      { "number": 2, "name": "B", "trackId": "spa gp", "carId": "formulaf1600",
+      { "number": 2, "name": "B", "trackId": 181, "carId": 67,
         "gold": "2:30.000", "silver": "2:32.000", "bronze": "2:34.000" }
     ]
     """;
@@ -17,26 +17,17 @@ public class ChallengeCatalogTests
     public void Find_MatchesOnTrackAndCar()
     {
         var catalog = ChallengeCatalog.FromJson(TwoRows);
-        Assert.Equal(1, catalog.Find("limerock full", "mx5 mx52016", wet: false)!.Number);
-        Assert.Equal(2, catalog.Find("spa gp", "formulaf1600", wet: false)!.Number);
+        Assert.Equal(1, catalog.Find(299, 142, wet: false)!.Number);
+        Assert.Equal(2, catalog.Find(181, 67, wet: false)!.Number);
     }
 
     [Theory]
-    [InlineData("LIMEROCK FULL", "MX5 MX52016")]
-    [InlineData("  limerock full  ", " mx5 mx52016 ")]
-    [InlineData("LimeRock Full", "Mx5 Mx52016")]
-    public void Find_IgnoresCaseAndSurroundingWhitespace(string track, string car)
-    {
-        Assert.Equal(1, ChallengeCatalog.FromJson(TwoRows).Find(track, car, wet: false)!.Number);
-    }
-
-    [Theory]
-    [InlineData("limerock full", "formulaf1600")]   // right track, wrong car
-    [InlineData("spa gp", "mx5 mx52016")]           // right car, wrong track
-    [InlineData("monza full", "mx5 mx52016")]
-    [InlineData(null, null)]
-    [InlineData("", "")]
-    public void Find_ReturnsNullWhenNothingMatches(string? track, string? car)
+    [InlineData(299, 67)]    // right track, wrong car
+    [InlineData(181, 142)]   // right car, wrong track
+    [InlineData(500, 142)]
+    [InlineData(0, 0)]       // the SDK's "nothing loaded yet"
+    [InlineData(-1, -1)]
+    public void Find_ReturnsNullWhenNothingMatches(int track, int car)
     {
         Assert.Null(ChallengeCatalog.FromJson(TwoRows).Find(track, car, wet: false));
     }
@@ -46,9 +37,9 @@ public class ChallengeCatalogTests
     {
         const string duplicated = """
         [
-          { "number": 1, "name": "A", "trackId": "t", "carId": "c",
+          { "number": 1, "name": "A", "trackId": 1, "carId": 2,
             "gold": "1:00.000", "silver": "1:01.000", "bronze": "1:02.000" },
-          { "number": 2, "name": "B", "trackId": "T", "carId": "C",
+          { "number": 2, "name": "B", "trackId": 1, "carId": 2,
             "gold": "1:00.000", "silver": "1:01.000", "bronze": "1:02.000" }
         ]
         """;
@@ -61,24 +52,24 @@ public class ChallengeCatalogTests
         // This is challenges 14 and 19: the same car, on the same Le Mans layout.
         const string lemans = """
         [
-          { "number": 14, "name": "Le Mans dry", "trackId": "lemans 24h", "carId": "dallarap217",
+          { "number": 14, "name": "Le Mans dry", "trackId": 268, "carId": 128,
             "gold": "3:36.250", "silver": "3:37.000", "bronze": "3:38.800" },
-          { "number": 19, "name": "Le Mans wet", "trackId": "lemans 24h", "carId": "dallarap217",
+          { "number": 19, "name": "Le Mans wet", "trackId": 268, "carId": 128,
             "wet": true,
             "gold": "4:10.200", "silver": "4:11.200", "bronze": "4:13.700" }
         ]
         """;
 
         var catalog = ChallengeCatalog.FromJson(lemans);
-        Assert.Equal(14, catalog.Find("lemans 24h", "dallarap217", wet: false)!.Number);
-        Assert.Equal(19, catalog.Find("lemans 24h", "dallarap217", wet: true)!.Number);
+        Assert.Equal(14, catalog.Find(268, 128, wet: false)!.Number);
+        Assert.Equal(19, catalog.Find(268, 128, wet: true)!.Number);
     }
 
     [Fact]
     public void ADryChallengeDoesNotMatchInTheWet()
     {
         // Otherwise the wet targets would be handed out in the dry, where they're trivial.
-        Assert.Null(ChallengeCatalog.FromJson(TwoRows).Find("limerock full", "mx5 mx52016", wet: true));
+        Assert.Null(ChallengeCatalog.FromJson(TwoRows).Find(299, 142, wet: true));
     }
 
     [Fact]
@@ -86,7 +77,7 @@ public class ChallengeCatalogTests
     {
         const string backwards = """
         [
-          { "number": 1, "name": "A", "trackId": "t", "carId": "c",
+          { "number": 1, "name": "A", "trackId": 1, "carId": 2,
             "gold": "1:05.000", "silver": "1:01.000", "bronze": "1:02.000" }
         ]
         """;
@@ -99,8 +90,8 @@ public class ChallengeCatalogTests
         foreach (var c in ChallengeCatalog.Embedded.Challenges)
         {
             Assert.False(string.IsNullOrWhiteSpace(c.Name), $"Challenge {c.Number} has no name.");
-            Assert.False(string.IsNullOrWhiteSpace(c.TrackId), $"Challenge {c.Number} has no trackId.");
-            Assert.False(string.IsNullOrWhiteSpace(c.CarId), $"Challenge {c.Number} has no carId.");
+            Assert.True(c.TrackId > 0, $"Challenge {c.Number} has no trackId.");
+            Assert.True(c.CarId > 0, $"Challenge {c.Number} has no carId.");
             c.Validate();
         }
     }

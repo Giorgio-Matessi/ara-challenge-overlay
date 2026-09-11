@@ -28,11 +28,11 @@ public sealed class Challenge
     public int Number { get; init; }
     public string Name { get; init; } = "";
 
-    /// <summary>iRacing's WeekendInfo:TrackName, e.g. "limerock full" — not the display name.</summary>
-    public string TrackId { get; init; } = "";
+    /// <summary>iRacing's WeekendInfo:TrackID — the layout, not the track package.</summary>
+    public int TrackId { get; init; }
 
-    /// <summary>iRacing's DriverInfo:Drivers:CarPath, e.g. "mx5 mx52016" — not the display name.</summary>
-    public string CarId { get; init; } = "";
+    /// <summary>iRacing's DriverInfo:Drivers:CarID.</summary>
+    public int CarId { get; init; }
 
     /// <summary>
     /// True for the wet-weather challenges. Track and car alone don't identify a challenge:

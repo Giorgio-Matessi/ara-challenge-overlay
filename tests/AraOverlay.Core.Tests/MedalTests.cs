@@ -8,8 +8,8 @@ public class MedalTests
     {
         Number = 1,
         Name = "Test Challenge",
-        TrackId = "limerock full",
-        CarId = "mx5 mx52016",
+        TrackId = 299,
+        CarId = 142,
         Gold = "0:53.500",
         Silver = "0:54.200",
         Bronze = "0:55.000",

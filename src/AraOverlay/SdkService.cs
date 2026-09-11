@@ -19,9 +19,13 @@ public sealed class SdkService : IDisposable
     /// <summary>True while iRacing is running and handing us telemetry.</summary>
     public bool Connected { get; private set; }
 
-    /// <summary>iRacing's internal ids for the current session, shown when nothing matches.</summary>
-    public string TrackId { get; private set; } = "";
-    public string CarId { get; private set; } = "";
+    /// <summary>iRacing's numeric ids for the current session — what a challenge matches on.</summary>
+    public int TrackId { get; private set; }
+    public int CarId { get; private set; }
+
+    /// <summary>The same track and car by name, so the unmatched panel is readable.</summary>
+    public string TrackName { get; private set; } = "";
+    public string CarName { get; private set; } = "";
 
     /// <summary>True when the session counts as wet — challenges 16-20 need this to match.</summary>
     public bool IsWet => _conditions.IsWet;
@@ -58,7 +62,8 @@ public sealed class SdkService : IDisposable
     {
         Connected = false;
         Challenge = null;
-        TrackId = CarId = "";
+        TrackId = CarId = 0;
+        TrackName = CarName = "";
         _tracker.Reset();
         _conditions.Reset();
         StateChanged?.Invoke();
@@ -66,19 +71,25 @@ public sealed class SdkService : IDisposable
 
     private void HandleSessionInfo()
     {
-        string track = "", car = "";
+        int track = 0, car = 0;
+        string trackName = "", carName = "";
         try
         {
             var info = _sdk.Data.SessionInfo;
-            track = info.WeekendInfo.TrackName ?? "";
+            track = info.WeekendInfo.TrackID;
+            trackName = info.WeekendInfo.TrackName ?? "";
 
             var me = info.DriverInfo.Drivers.FirstOrDefault(d => d.CarIdx == info.DriverInfo.DriverCarIdx);
-            car = me?.CarPath ?? "";
+            car = me?.CarID ?? 0;
+            carName = me?.CarPath ?? "";
         }
         catch (Exception)
         {
-            // A session string we can't read means no match; the overlay just shows nothing.
+            // Session info we can't read means no match; the overlay just shows nothing.
         }
+
+        TrackName = trackName;
+        CarName = carName;
 
         if (track == TrackId && car == CarId) return;
 

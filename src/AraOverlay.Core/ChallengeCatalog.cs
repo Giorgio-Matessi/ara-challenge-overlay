@@ -13,23 +13,23 @@ public sealed class ChallengeCatalog
         AllowTrailingCommas = true,
     };
 
-    private readonly Dictionary<(string Track, string Car, bool Wet), Challenge> _byCombination;
+    private readonly Dictionary<(int Track, int Car, bool Wet), Challenge> _byCombination;
 
     public IReadOnlyList<Challenge> Challenges { get; }
 
     private ChallengeCatalog(IReadOnlyList<Challenge> challenges)
     {
         Challenges = challenges;
-        _byCombination = new Dictionary<(string, string, bool), Challenge>();
+        _byCombination = new Dictionary<(int, int, bool), Challenge>();
 
         foreach (var challenge in challenges)
         {
             challenge.Validate();
-            var key = Key(challenge.TrackId, challenge.CarId, challenge.Wet);
+            var key = (challenge.TrackId, challenge.CarId, challenge.Wet);
             if (!_byCombination.TryAdd(key, challenge))
                 throw new InvalidDataException(
                     $"Challenges {_byCombination[key].Number} and {challenge.Number} share the same " +
-                    $"track+car+conditions ('{challenge.TrackId}' / '{challenge.CarId}' / " +
+                    $"track+car+conditions ({challenge.TrackId} / {challenge.CarId} / " +
                     $"{(challenge.Wet ? "wet" : "dry")}). The overlay could not tell them apart.");
         }
     }
@@ -44,14 +44,8 @@ public sealed class ChallengeCatalog
     }
 
     /// <summary>The challenge for this track, car and condition, or null if there isn't one.</summary>
-    public Challenge? Find(string? trackId, string? carId, bool wet)
-    {
-        if (string.IsNullOrWhiteSpace(trackId) || string.IsNullOrWhiteSpace(carId)) return null;
-        return _byCombination.GetValueOrDefault(Key(trackId, carId, wet));
-    }
-
-    private static (string, string, bool) Key(string track, string car, bool wet) =>
-        (track.Trim().ToLowerInvariant(), car.Trim().ToLowerInvariant(), wet);
+    public Challenge? Find(int trackId, int carId, bool wet) =>
+        _byCombination.GetValueOrDefault((trackId, carId, wet));
 
     private static ChallengeCatalog LoadEmbedded()
     {
