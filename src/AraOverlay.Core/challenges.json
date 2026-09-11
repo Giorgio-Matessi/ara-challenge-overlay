@@ -10,14 +10,14 @@
 [
   {
     "number": 1,
-    "name": "Snetterton Circuit (100) — Formula Vee Classic",
+    "name": "Snetterton Circuit (100) — Formula Vee - Classic",
     "trackIds": [299],
     "carId": 142,
     "bronze": "0:49.899", "silver": "0:49.599", "gold": "0:49.299"
   },
   {
     "number": 2,
-    "name": "Oulton Park (Fosters) — Global Mazda MX-5 Cup",
+    "name": "Oulton Park Circuit (Fosters) — Global Mazda MX-5 Cup",
     "trackIds": [181],
     "carId": 67,
     "bronze": "1:07.100", "silver": "1:06.600", "gold": "1:06.100"
@@ -31,28 +31,28 @@
   },
   {
     "number": 4,
-    "name": "Okayama (Full Course) — Global Mazda MX-5 Cup",
+    "name": "Okayama International Circuit (Full Course) — Global Mazda MX-5 Cup",
     "trackIds": [166],
     "carId": 67,
     "bronze": "1:45.500", "silver": "1:44.700", "gold": "1:44.000"
   },
   {
     "number": 5,
-    "name": "Laguna Seca (2026) — Ray FF1600",
+    "name": "WeatherTech Raceway at Laguna Seca (2026) — Ray FF1600",
     "trackIds": [586],
     "carId": 163,
     "bronze": "1:30.600", "silver": "1:30.000", "gold": "1:29.500"
   },
   {
     "number": 6,
-    "name": "Tsukuba (2000 Full) — Porsche 911 Cup (992.2)",
+    "name": "Tsukuba Circuit (2000 Full) — Porsche 911 Cup (992.2)",
     "trackIds": [324],
     "carId": 208,
     "bronze": "0:53.850", "silver": "0:53.000", "gold": "0:52.700"
   },
   {
     "number": 7,
-    "name": "Oran Park (Grand Prix) — Global Mazda MX-5 Cup",
+    "name": "Oran Park Raceway (Grand Prix) — Global Mazda MX-5 Cup",
     "trackIds": [202],
     "carId": 67,
     "bronze": "1:15.500", "silver": "1:14.800", "gold": "1:14.300"
@@ -80,35 +80,35 @@
   },
   {
     "number": 11,
-    "name": "Spa-Francorchamps (Grand Prix Pits) — Dallara P217",
+    "name": "Circuit de Spa-Francorchamps (Grand Prix Pits) — Dallara P217",
     "trackIds": [523, 163],
     "carId": 128,
     "bronze": "2:09.700", "silver": "2:08.700", "gold": "2:07.900"
   },
   {
     "number": 12,
-    "name": "Virginia International Raceway (Full) — Porsche 911 Cup (992.2)",
+    "name": "Virginia International Raceway (Full Course) — Porsche 911 Cup (992.2)",
     "trackIds": [465],
     "carId": 208,
     "bronze": "1:46.000", "silver": "1:45.000", "gold": "1:44.300"
   },
   {
     "number": 13,
-    "name": "Sebring (International) — NASCAR Truck Silverado 2008",
+    "name": "Sebring International Raceway (International) — NASCAR Truck Chevrolet Silverado - 2008",
     "trackIds": [95],
     "carId": 20,
     "bronze": "2:12.500", "silver": "2:11.250", "gold": "2:09.800"
   },
   {
     "number": 14,
-    "name": "Le Mans (24 Heures du Mans) — Dallara P217",
+    "name": "Circuit des 24 Heures du Mans — Dallara P217",
     "trackIds": [268],
     "carId": 128,
     "bronze": "3:38.800", "silver": "3:37.000", "gold": "3:36.250"
   },
   {
     "number": 15,
-    "name": "Nordschleife (Industriefahrten) — Radical SR8",
+    "name": "Nürburgring Nordschleife (Industriefahrten) — Radical SR8",
     "trackIds": [249],
     "carId": 13,
     "bronze": "6:24.500", "silver": "6:22.500", "gold": "6:19.500"
@@ -117,7 +117,7 @@
   // 16-20 are the wet-weather challenges.
   {
     "number": 16,
-    "name": "Oran Park (Grand Prix) — Ray FF1600 · WET",
+    "name": "Oran Park Raceway (Grand Prix) — Ray FF1600 · WET",
     "trackIds": [202],
     "carId": 163,
     "wet": true,
@@ -133,7 +133,7 @@
   },
   {
     "number": 18,
-    "name": "Spa-Francorchamps (Grand Prix Pits) — Ferrari 296 GT3 · WET",
+    "name": "Circuit de Spa-Francorchamps (Grand Prix Pits) — Ferrari 296 GT3 · WET",
     "trackIds": [163, 523],
     "carId": 173,
     "wet": true,
@@ -141,7 +141,7 @@
   },
   {
     "number": 19,
-    "name": "Le Mans (24 Heures du Mans) — Dallara P217 · WET",
+    "name": "Circuit des 24 Heures du Mans — Dallara P217 · WET",
     "trackIds": [268],
     "carId": 128,
     "wet": true,
@@ -149,7 +149,7 @@
   },
   {
     "number": 20,
-    "name": "Nordschleife (Industriefahrten) — Ray FF1600 · WET",
+    "name": "Nürburgring Nordschleife (Industriefahrten) — Ray FF1600 · WET",
     "trackIds": [249],
     "carId": 163,
     "wet": true,

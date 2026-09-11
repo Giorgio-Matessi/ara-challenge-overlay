@@ -141,7 +141,7 @@ public partial class MainWindow : Window
         try
         {
             Clipboard.SetText(
-                $"\"trackId\": {_sdk.TrackId},   // {_sdk.TrackName}\n" +
+                $"\"trackIds\": [{_sdk.TrackId}],   // {_sdk.TrackName}\n" +
                 $"\"carId\": {_sdk.CarId},   // {_sdk.CarName}\n" +
                 (_sdk.IsWet ? "\"wet\": true,\n" : ""));
         }
