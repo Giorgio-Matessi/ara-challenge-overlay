@@ -7,6 +7,13 @@ using System.Windows.Threading;
 using AraOverlay.Core;
 using Forms = System.Windows.Forms;
 
+// UseWindowsForms adds System.Windows.Forms and System.Drawing as implicit usings, which
+// collide with WPF's types of the same name. This file wants the WPF ones; WinForms is
+// reached through the Forms alias above.
+using Application = System.Windows.Application;
+using Clipboard = System.Windows.Clipboard;
+using Color = System.Windows.Media.Color;
+
 namespace AraOverlay;
 
 public partial class MainWindow : Window
