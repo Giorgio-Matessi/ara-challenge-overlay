@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Media;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
@@ -120,7 +121,7 @@ public partial class MainWindow : Window
 
         _tray = new Forms.NotifyIcon
         {
-            Icon = System.Drawing.SystemIcons.Information,
+            Icon = TrayIcon(),
             Text = "ARA Challenge Overlay",
             Visible = true,
             ContextMenuStrip = menu,
@@ -177,6 +178,22 @@ public partial class MainWindow : Window
         TrackText.Visibility = CarText.Visibility = Visibility.Collapsed;
         Targets.Visibility = Visibility.Collapsed;
         StatusText.Text = "track  0  \ncar    0  \ncond   dry";
+    }
+
+    /// <summary>
+    /// The tray icon, picked at the size Windows actually wants — a 16px frame on a standard
+    /// display, a larger one when scaled. Matched by suffix so renaming the root namespace
+    /// doesn't silently fall back to the stock icon.
+    /// </summary>
+    private static System.Drawing.Icon TrayIcon()
+    {
+        var assembly = Assembly.GetExecutingAssembly();
+        var name = Array.Find(assembly.GetManifestResourceNames(),
+            n => n.EndsWith(".ico", StringComparison.Ordinal));
+        if (name is null) return System.Drawing.SystemIcons.Information;
+
+        using var stream = assembly.GetManifestResourceStream(name)!;
+        return new System.Drawing.Icon(stream, Forms.SystemInformation.SmallIconSize);
     }
 
     // ---- rendering --------------------------------------------------------

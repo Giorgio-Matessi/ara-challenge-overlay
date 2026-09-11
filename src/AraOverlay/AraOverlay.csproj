@@ -9,6 +9,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>AraChallengeOverlay</AssemblyName>
     <RootNamespace>AraOverlay</RootNamespace>
+    <ApplicationIcon>AraOverlay.ico</ApplicationIcon>
 
     <!-- Publish settings, so a league member gets one file and nothing to install.
          WPF pulls in native DLLs (PresentationNative, wpfgfx, vcruntime140, D3DCompiler,
@@ -17,6 +18,11 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <DebugType>none</DebugType>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- ApplicationIcon covers Explorer and the taskbar; the tray needs it as a stream too. -->
+    <EmbeddedResource Include="AraOverlay.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="IRSDKSharper" Version="1.1.9" />

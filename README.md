@@ -72,6 +72,12 @@ Those ids aren't reliably guessable from a track or car name, so if a challenge 
 load it in the sim, use the tray's **Copy current track/car ID**, and paste the result over the
 row. The tests will catch out-of-order times and duplicate track+car pairs at build time.
 
+## Changing the icon
+
+`src/AraOverlay/AraOverlay.ico` is both the exe icon and the tray icon. Replace it with any
+multi-size `.ico` — include a 16x16 frame, since that is what the tray actually draws — and
+rebuild. Keep the filename, or update `ApplicationIcon` in `AraOverlay.csproj` to match.
+
 ## Building
 
 ```bash
