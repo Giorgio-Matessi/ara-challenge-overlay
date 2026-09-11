@@ -74,9 +74,17 @@ row. The tests will catch out-of-order times and duplicate track+car pairs at bu
 
 ## Changing the icon
 
-`src/AraOverlay/AraOverlay.ico` is both the exe icon and the tray icon. Replace it with any
-multi-size `.ico` — include a 16x16 frame, since that is what the tray actually draws — and
-rebuild. Keep the filename, or update `ApplicationIcon` in `AraOverlay.csproj` to match.
+`src/AraOverlay/AraOverlay.ico` is both the exe icon and the tray icon. To use a PNG instead:
+
+```bash
+python3 tools/png_to_ico.py your-logo.png src/AraOverlay/AraOverlay.ico
+```
+
+then rebuild. The script needs nothing installed, and writes the tray sizes as classic DIB
+frames because `System.Drawing.Icon` reads PNG-compressed frames unreliably.
+
+Feed it a **square** PNG — anything else gets squashed, so crop first. Detail disappears at
+16x16, which is the size the tray actually draws, so a simple shape beats a detailed logo.
 
 ## Building
 
