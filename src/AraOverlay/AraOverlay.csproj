@@ -20,8 +20,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- ApplicationIcon covers Explorer and the taskbar; the tray needs it as a stream too. -->
-    <EmbeddedResource Include="AraOverlay.ico" />
+    <!-- ApplicationIcon covers Explorer and the taskbar; the tray needs it as a stream too.
+         LogicalName pins the resource name, which otherwise depends on RootNamespace. -->
+    <EmbeddedResource Include="AraOverlay.ico" LogicalName="AraOverlay.ico" />
   </ItemGroup>
 
   <ItemGroup>

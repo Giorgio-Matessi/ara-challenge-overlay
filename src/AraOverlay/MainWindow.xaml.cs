@@ -181,19 +181,29 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// The tray icon, picked at the size Windows actually wants — a 16px frame on a standard
-    /// display, a larger one when scaled. Matched by suffix so renaming the root namespace
-    /// doesn't silently fall back to the stock icon.
+    /// The tray icon at the size Windows actually wants — a 16px frame on a standard display,
+    /// a larger one when scaled. The embedded copy is preferred because it can pick that frame;
+    /// the exe's own ApplicationIcon is the backstop, and only then the stock blue "i".
     /// </summary>
     private static System.Drawing.Icon TrayIcon()
     {
-        var assembly = Assembly.GetExecutingAssembly();
-        var name = Array.Find(assembly.GetManifestResourceNames(),
-            n => n.EndsWith(".ico", StringComparison.Ordinal));
-        if (name is null) return System.Drawing.SystemIcons.Information;
+        try
+        {
+            // LogicalName in the csproj fixes this string, so it can't drift with RootNamespace.
+            using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("AraOverlay.ico");
+            if (stream is not null)
+                return new System.Drawing.Icon(stream, Forms.SystemInformation.SmallIconSize);
 
-        using var stream = assembly.GetManifestResourceStream(name)!;
-        return new System.Drawing.Icon(stream, Forms.SystemInformation.SmallIconSize);
+            var exe = Environment.ProcessPath;
+            if (exe is not null && System.Drawing.Icon.ExtractAssociatedIcon(exe) is { } fromExe)
+                return fromExe;
+        }
+        catch (Exception e) when (e is ArgumentException or IOException)
+        {
+            // A malformed .ico shouldn't cost the driver their overlay.
+        }
+
+        return System.Drawing.SystemIcons.Information;
     }
 
     // ---- rendering --------------------------------------------------------

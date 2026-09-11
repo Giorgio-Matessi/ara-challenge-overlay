@@ -89,16 +89,6 @@ dotnet build src/AraOverlay                      # Windows only (WPF)
 dotnet publish src/AraOverlay -c Release -r win-x64 --self-contained  # one exe for the league
 ```
 
-### Seeing the overlay without iRacing
-
-```bash
-AraChallengeOverlay.exe --demo
-```
-
-Cycles every challenge through the real panel and medal banner, 2.5 seconds apart, with no sim
-attached — the way to check the layout on a machine that can't run iRacing. The medal chime is
-muted. Exit from the tray icon.
-
 `AraOverlay.Core` holds every decision worth getting right — time parsing, challenge matching,
 medal thresholds, lap validity, progress — and has no UI or SDK dependency, so it's covered by
 tests that run anywhere. `src/AraOverlay` is the WPF shell and `SdkService.cs` is the only file
