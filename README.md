@@ -72,10 +72,20 @@ row. The tests will catch out-of-order times and duplicate track+car pairs at bu
 ## Building
 
 ```bash
-dotnet test tests/AraOverlay.Core.Tests          # logic only — runs on any OS
+dotnet test                                      # logic only — runs on any OS
 dotnet build src/AraOverlay                      # Windows only (WPF)
 dotnet publish src/AraOverlay -c Release -r win-x64 --self-contained  # one exe for the league
 ```
+
+### Seeing the overlay without iRacing
+
+```bash
+AraChallengeOverlay.exe --demo
+```
+
+Cycles every challenge through the real panel and medal banner, 2.5 seconds apart, with no sim
+attached — the way to check the layout on a machine that can't run iRacing. The medal chime is
+muted. Exit from the tray icon.
 
 `AraOverlay.Core` holds every decision worth getting right — time parsing, challenge matching,
 medal thresholds, lap validity, progress — and has no UI or SDK dependency, so it's covered by

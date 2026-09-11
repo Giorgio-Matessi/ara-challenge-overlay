@@ -35,6 +35,7 @@ public partial class MainWindow : Window
     private Forms.ToolStripMenuItem? _lockItem;
     private IntPtr _hwnd;
     private string _lastLapLine = "";
+    private bool _demo;
 
     public MainWindow()
     {
@@ -57,7 +58,9 @@ public partial class MainWindow : Window
         _hwnd = new WindowInteropHelper(this).Handle;
         ApplyWindowStyles();
         BuildTrayIcon();
-        _sdk.Start();
+
+        if (Environment.GetCommandLineArgs().Contains("--demo")) StartDemo();
+        else _sdk.Start();
     }
 
     // ---- window behaviour -------------------------------------------------
@@ -124,6 +127,48 @@ public partial class MainWindow : Window
         };
     }
 
+    /// <summary>
+    /// Renders every challenge in turn with no sim attached, so the overlay can be looked at —
+    /// and its longest names checked for wrapping — on a machine that can't run iRacing.
+    /// </summary>
+    private void StartDemo()
+    {
+        _demo = true;   // 20 banners in a row, so the medal chime stays off
+
+        var challenges = ChallengeCatalog.Embedded.Challenges.OrderBy(c => c.Number).ToList();
+        var step = 0;
+
+        var demo = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
+        demo.Tick += (_, _) =>
+        {
+            var challenge = challenges[step / 2 % challenges.Count];
+
+            // Alternate panel and banner, so both states get looked at for every challenge.
+            if (step % 2 == 0)
+            {
+                HideBanner();
+                Root.Visibility = Visibility.Visible;
+                ShowChallenge(challenge);
+                StatusText.Text = $"demo   lap  {TimeFormat.Format(challenge.GoldSeconds + 1.234)}";
+            }
+            else
+            {
+                ShowBanner(Medal.Gold, challenge.GoldSeconds - 0.05, challenge);
+            }
+
+            step++;
+        };
+
+        demo.Start();
+
+        // The unmatched panel is the one state with no challenge, so show it first.
+        Root.Visibility = Visibility.Visible;
+        TitleText.Text = "No ARA challenge for this combination";
+        TrackText.Visibility = CarText.Visibility = Visibility.Collapsed;
+        Targets.Visibility = Visibility.Collapsed;
+        StatusText.Text = "track  0  \ncar    0  \ncond   dry";
+    }
+
     // ---- rendering --------------------------------------------------------
 
     private void RenderState()
@@ -141,15 +186,7 @@ public partial class MainWindow : Window
 
         if (_sdk.Challenge is { } challenge)
         {
-            TitleText.Text = $"CHALLENGE {challenge.Number}{(challenge.Wet ? "  ·  WET" : "")}";
-            TrackText.Text = challenge.Track;
-            CarText.Text = challenge.Car;
-            TrackText.Visibility = CarText.Visibility = Visibility.Visible;
-            Targets.Visibility = Visibility.Visible;
-            GoldTime.Text = TimeFormat.Format(challenge.GoldSeconds);
-            SilverTime.Text = TimeFormat.Format(challenge.SilverSeconds);
-            BronzeTime.Text = TimeFormat.Format(challenge.BronzeSeconds);
-            UpdateHeldMarks(challenge);
+            ShowChallenge(challenge);
             StatusText.Text = "";
         }
         else
@@ -162,6 +199,19 @@ public partial class MainWindow : Window
                               $"car    {_sdk.CarId}  {_sdk.CarName}\n" +
                               $"cond   {(_sdk.IsWet ? "wet" : "dry")}";
         }
+    }
+
+    private void ShowChallenge(Challenge challenge)
+    {
+        TitleText.Text = $"CHALLENGE {challenge.Number}{(challenge.Wet ? "  ·  WET" : "")}";
+        TrackText.Text = challenge.Track;
+        CarText.Text = challenge.Car;
+        TrackText.Visibility = CarText.Visibility = Visibility.Visible;
+        Targets.Visibility = Visibility.Visible;
+        GoldTime.Text = TimeFormat.Format(challenge.GoldSeconds);
+        SilverTime.Text = TimeFormat.Format(challenge.SilverSeconds);
+        BronzeTime.Text = TimeFormat.Format(challenge.BronzeSeconds);
+        UpdateHeldMarks(challenge);
     }
 
     private void UpdateHeldMarks(Challenge challenge)
@@ -235,7 +285,7 @@ public partial class MainWindow : Window
 
         _bannerTimer.Stop();
         _bannerTimer.Start();
-        SystemSounds.Asterisk.Play();
+        if (!_demo) SystemSounds.Asterisk.Play();
     }
 
     private void HideBanner()
