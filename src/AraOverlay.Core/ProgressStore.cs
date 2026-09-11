@@ -1,5 +1,3 @@
-using System.Text.Json;
-
 namespace AraOverlay.Core;
 
 public sealed record ChallengeProgress(double BestSeconds, Medal BestMedal);
@@ -12,21 +10,16 @@ public sealed record ChallengeProgress(double BestSeconds, Medal BestMedal);
 /// </summary>
 public sealed class ProgressStore
 {
-    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
-
     private readonly string _path;
     private readonly Dictionary<int, ChallengeProgress> _progress;
 
     public ProgressStore(string path)
     {
         _path = path;
-        _progress = Load(path);
+        _progress = JsonFile.Load<Dictionary<int, ChallengeProgress>>(path) ?? new();
     }
 
-    public static string DefaultPath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "AraOverlay",
-        "progress.json");
+    public static string DefaultPath => JsonFile.PathIn("progress.json");
 
     public ChallengeProgress? Get(int challengeNumber) => _progress.GetValueOrDefault(challengeNumber);
 
@@ -52,33 +45,5 @@ public sealed class ProgressStore
         return improvedTier;
     }
 
-    private static Dictionary<int, ChallengeProgress> Load(string path)
-    {
-        try
-        {
-            if (!File.Exists(path)) return new Dictionary<int, ChallengeProgress>();
-            return JsonSerializer.Deserialize<Dictionary<int, ChallengeProgress>>(File.ReadAllText(path))
-                   ?? new Dictionary<int, ChallengeProgress>();
-        }
-        catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException)
-        {
-            // A corrupt or unreadable file must never stop the overlay from running; the next
-            // clean lap rewrites it.
-            return new Dictionary<int, ChallengeProgress>();
-        }
-    }
-
-    private void Save()
-    {
-        try
-        {
-            var directory = Path.GetDirectoryName(_path);
-            if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
-            File.WriteAllText(_path, JsonSerializer.Serialize(_progress, JsonOptions));
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            // Losing progress is annoying; crashing mid-session is worse.
-        }
-    }
+    private void Save() => JsonFile.Save(_path, _progress);
 }

@@ -45,9 +45,6 @@ public static class TimeFormat
     }
 
     /// <summary>Renders a gap as "+1.204" / "-0.312" for the overlay's delta line.</summary>
-    public static string FormatDelta(double seconds)
-    {
-        var sign = seconds < 0 ? "-" : "+";
-        return sign + Math.Abs(seconds).ToString("0.000", CultureInfo.InvariantCulture);
-    }
+    public static string FormatDelta(double seconds) =>
+        seconds.ToString("+0.000;-0.000", CultureInfo.InvariantCulture);
 }
