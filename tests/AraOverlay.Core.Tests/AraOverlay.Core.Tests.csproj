@@ -14,6 +14,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- ImplicitUsings doesn't cover Xunit, and every test file needs it. -->
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\AraOverlay.Core\AraOverlay.Core.csproj" />
   </ItemGroup>
 
