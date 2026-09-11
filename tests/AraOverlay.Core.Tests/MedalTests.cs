@@ -7,7 +7,8 @@ public class MedalTests
     private static readonly Challenge Sample = new()
     {
         Number = 1,
-        Name = "Test Challenge",
+        Track = "Test Track",
+        Car = "Test Car",
         TrackIds = [299],
         CarId = 142,
         Gold = "0:53.500",

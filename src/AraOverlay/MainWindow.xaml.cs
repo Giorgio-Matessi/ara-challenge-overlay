@@ -168,7 +168,10 @@ public partial class MainWindow : Window
 
         if (_sdk.Challenge is { } challenge)
         {
-            TitleText.Text = $"#{challenge.Number}  {challenge.Name}";
+            TitleText.Text = $"CHALLENGE {challenge.Number}{(challenge.Wet ? "  ·  WET" : "")}";
+            TrackText.Text = challenge.Track;
+            CarText.Text = challenge.Car;
+            TrackText.Visibility = CarText.Visibility = Visibility.Visible;
             Targets.Visibility = Visibility.Visible;
             GoldTime.Text = TimeFormat.Format(challenge.GoldSeconds);
             SilverTime.Text = TimeFormat.Format(challenge.SilverSeconds);
@@ -179,6 +182,7 @@ public partial class MainWindow : Window
         else
         {
             TitleText.Text = "No ARA challenge for this combination";
+            TrackText.Visibility = CarText.Visibility = Visibility.Collapsed;
             Targets.Visibility = Visibility.Collapsed;
             // Conditions are shown too: a wet challenge simply won't match in the dry.
             StatusText.Text = $"track  {_sdk.TrackId}  {_sdk.TrackName}\n" +
@@ -251,7 +255,7 @@ public partial class MainWindow : Window
         BannerTitle.Foreground = brush;
         Banner.BorderBrush = brush;
         BannerTime.Text = TimeFormat.Format(seconds);
-        BannerSub.Text = $"#{challenge.Number}  {challenge.Name}";
+        BannerSub.Text = $"Challenge {challenge.Number} — {challenge.Track}";
 
         Banner.Visibility = Visibility.Visible;
         Panel.Visibility = Visibility.Collapsed;   // swap rather than stack, so nothing jumps

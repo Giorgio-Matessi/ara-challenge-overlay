@@ -26,7 +26,10 @@ public sealed class Challenge
     private const double DisplayTolerance = 0.0005;
 
     public int Number { get; init; }
-    public string Name { get; init; } = "";
+
+    /// <summary>Track and car as the league lists them — shown on their own overlay lines.</summary>
+    public string Track { get; init; } = "";
+    public string Car { get; init; } = "";
 
     /// <summary>
     /// iRacing's WeekendInfo:TrackID — the layout, not the track package. Usually one, but a
@@ -83,11 +86,11 @@ public sealed class Challenge
     public void Validate()
     {
         if (TrackIds.Length == 0)
-            throw new InvalidDataException($"Challenge {Number} ('{Name}') has no trackIds.");
+            throw new InvalidDataException($"Challenge {Number} ('{Track}') has no trackIds.");
 
         if (!(GoldSeconds < SilverSeconds && SilverSeconds < BronzeSeconds))
             throw new InvalidDataException(
-                $"Challenge {Number} ('{Name}') has times out of order: " +
+                $"Challenge {Number} ('{Track}') has times out of order: " +
                 $"gold {Gold}, silver {Silver}, bronze {Bronze}.");
     }
 }

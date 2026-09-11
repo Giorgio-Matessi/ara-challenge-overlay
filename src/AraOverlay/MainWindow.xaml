@@ -44,8 +44,21 @@
 
                 <TextBlock x:Name="TitleText"
                            Text="ARA Challenge Overlay"
-                           FontFamily="Segoe UI Semibold" FontSize="13"
+                           FontFamily="Segoe UI Semibold" FontSize="11"
+                           Foreground="{StaticResource Dim}"
+                           TextWrapping="Wrap" MaxWidth="300"/>
+
+                <TextBlock x:Name="TrackText"
+                           Visibility="Collapsed"
+                           Margin="0,3,0,0"
+                           FontFamily="Segoe UI Semibold" FontSize="15"
                            Foreground="{StaticResource Ink}"
+                           TextWrapping="Wrap" MaxWidth="300"/>
+
+                <TextBlock x:Name="CarText"
+                           Visibility="Collapsed"
+                           FontFamily="Segoe UI" FontSize="13"
+                           Foreground="{StaticResource Dim}"
                            TextWrapping="Wrap" MaxWidth="300"/>
 
                 <Grid x:Name="Targets" Margin="0,9,0,0">
