@@ -22,8 +22,8 @@ invisible until iRacing is up.
 
 - On a challenge's track+car: the three target times, a ✓ on every medal you already hold, your
   live lap time and how far the last lap sat from the next tier up.
-- On anything else: the track and car ids the sim reported, so you can check them against
-  `challenges.json`.
+- On anything else: the track and car ids the sim reported plus the detected conditions, so you
+  can check them against `challenges.json`.
 
 Right-click the tray icon for:
 
@@ -47,15 +47,23 @@ on iRacing's **internal ids**, not the display names:
 
 ```json
 {
-  "number": 1,
-  "name": "Lime Rock Park — Global Mazda MX-5 Cup",
-  "trackId": "limerock full",     // WeekendInfo:TrackName
-  "carId":   "mx5 mx52016",       // DriverInfo:CarPath
-  "gold":    "0:53.500",
-  "silver":  "0:54.200",
-  "bronze":  "0:55.000"
+  "number": 19,
+  "name": "Le Mans (24 Heures du Mans) — Dallara P217 · WET",
+  "trackId": "lemans 24h",        // WeekendInfo:TrackName
+  "carId":   "dallarap217",       // DriverInfo:CarPath
+  "wet":     true,                // challenges 16-20 only
+  "bronze":  "4:13.700",
+  "silver":  "4:11.200",
+  "gold":    "4:10.200"
 }
 ```
+
+Challenges **16-20 are the wet-weather versions**, so conditions are part of what identifies a
+challenge — 14 and 19 are the same car on the same Le Mans layout, 35 seconds apart. The overlay
+reads `TrackWetness` and `WeatherDeclaredWet` from the sim and picks the matching version. It
+uses two different thresholds on the way up and the way down, so a drying track can't flip the
+active challenge back and forth. A wet challenge simply won't match in the dry, which is
+deliberate: its targets would be free golds on a dry track.
 
 Those ids aren't reliably guessable from a track or car name, so if a challenge never lights up:
 load it in the sim, use the tray's **Copy current track/car ID**, and paste the result over the
