@@ -15,20 +15,20 @@
     "number": 1,
     "name": "Snetterton Circuit (100) — Formula Vee Classic",
     "trackId": "snetterton 100",
-    "carId": "fvee",
+    "carId": "formulavee",
     "bronze": "0:49.899", "silver": "0:49.599", "gold": "0:49.299"
   },
   {
     "number": 2,
     "name": "Oulton Park (Fosters) — Global Mazda MX-5 Cup",
-    "trackId": "oultonpark fosters",
+    "trackId": "oulton fosters",
     "carId": "mx5 mx52016",
     "bronze": "1:07.100", "silver": "1:06.600", "gold": "1:06.100"
   },
   {
     "number": 3,
     "name": "Summit Point Raceway — Toyota GR86",
-    "trackId": "summitpoint summitpoint",
+    "trackId": "summit summit",
     "carId": "toyotagr86",
     "bronze": "1:20.250", "silver": "1:19.450", "gold": "1:19.150"
   },
@@ -43,27 +43,27 @@
     "number": 5,
     "name": "Laguna Seca (2026) — Ray FF1600",
     "trackId": "lagunaseca 2026",
-    "carId": "rayff1600",
+    "carId": "raygr22",
     "bronze": "1:30.600", "silver": "1:30.000", "gold": "1:29.500"
   },
   {
     "number": 6,
     "name": "Tsukuba (2000 Full) — Porsche 911 Cup (992.2)",
-    "trackId": "tsukuba 2000full",
-    "carId": "porsche992cup",
+    "trackId": "tsukuba 2kfull",
+    "carId": "porsche9922cup",
     "bronze": "0:53.850", "silver": "0:53.000", "gold": "0:52.700"
   },
   {
     "number": 7,
     "name": "Oran Park (Grand Prix) — Global Mazda MX-5 Cup",
-    "trackId": "oranpark gp",
+    "trackId": "oran gp",
     "carId": "mx5 mx52016",
     "bronze": "1:15.500", "silver": "1:14.800", "gold": "1:14.300"
   },
   {
     "number": 8,
     "name": "Circuito de Navarra (Speed Circuit) — Ferrari 296 GT3",
-    "trackId": "navarra speed",
+    "trackId": "navarra speedlong",
     "carId": "ferrari296gt3",
     "bronze": "1:38.900", "silver": "1:37.200", "gold": "1:36.700"
   },
@@ -77,43 +77,43 @@
   {
     "number": 10,
     "name": "Lime Rock Park (Grand Prix) — Radical SR8",
-    "trackId": "limerock grandprix",
-    "carId": "radicalsr8",
+    "trackId": "limerock 2019",
+    "carId": "radical sr8",
     "bronze": "0:48.000", "silver": "0:47.400", "gold": "0:47.000"
   },
   {
     "number": 11,
     "name": "Spa-Francorchamps (Grand Prix Pits) — Dallara P217",
-    "trackId": "spa grandprixpits",
+    "trackId": "spa 2024",
     "carId": "dallarap217",
     "bronze": "2:09.700", "silver": "2:08.700", "gold": "2:07.900"
   },
   {
     "number": 12,
     "name": "Virginia International Raceway (Full) — Porsche 911 Cup (992.2)",
-    "trackId": "virginia full",
-    "carId": "porsche992cup",
+    "trackId": "virginia 2022",
+    "carId": "porsche9922cup",
     "bronze": "1:46.000", "silver": "1:45.000", "gold": "1:44.300"
   },
   {
     "number": 13,
     "name": "Sebring (International) — NASCAR Truck Silverado 2008",
     "trackId": "sebring international",
-    "carId": "silverado2008",
+    "carId": "trucks silverado2008",
     "bronze": "2:12.500", "silver": "2:11.250", "gold": "2:09.800"
   },
   {
     "number": 14,
     "name": "Le Mans (24 Heures du Mans) — Dallara P217",
-    "trackId": "lemans 24h",
+    "trackId": "lemans full",
     "carId": "dallarap217",
     "bronze": "3:38.800", "silver": "3:37.000", "gold": "3:36.250"
   },
   {
     "number": 15,
     "name": "Nordschleife (Industriefahrten) — Radical SR8",
-    "trackId": "nordschleife industriefahrten",
-    "carId": "radicalsr8",
+    "trackId": "nurburgring nordschleifetourist",
+    "carId": "radical sr8",
     "bronze": "6:24.500", "silver": "6:22.500", "gold": "6:19.500"
   },
 
@@ -121,15 +121,15 @@
   {
     "number": 16,
     "name": "Oran Park (Grand Prix) — Ray FF1600 · WET",
-    "trackId": "oranpark gp",
-    "carId": "rayff1600",
+    "trackId": "oran gp",
+    "carId": "raygr22",
     "wet": true,
     "bronze": "1:17.000", "silver": "1:15.950", "gold": "1:15.450"
   },
   {
     "number": 17,
     "name": "Summit Point Raceway — Global Mazda MX-5 Cup · WET",
-    "trackId": "summitpoint summitpoint",
+    "trackId": "summit summit",
     "carId": "mx5 mx52016",
     "wet": true,
     "bronze": "1:31.300", "silver": "1:30.300", "gold": "1:29.800"
@@ -137,7 +137,7 @@
   {
     "number": 18,
     "name": "Spa-Francorchamps (Grand Prix Pits) — Ferrari 296 GT3 · WET",
-    "trackId": "spa grandprixpits",
+    "trackId": "spa 2024",
     "carId": "ferrari296gt3",
     "wet": true,
     "bronze": "2:49.800", "silver": "2:48.600", "gold": "2:47.900"
@@ -145,7 +145,7 @@
   {
     "number": 19,
     "name": "Le Mans (24 Heures du Mans) — Dallara P217 · WET",
-    "trackId": "lemans 24h",
+    "trackId": "lemans full",
     "carId": "dallarap217",
     "wet": true,
     "bronze": "4:13.700", "silver": "4:11.200", "gold": "4:10.200"
@@ -153,8 +153,8 @@
   {
     "number": 20,
     "name": "Nordschleife (Industriefahrten) — Ray FF1600 · WET",
-    "trackId": "nordschleife industriefahrten",
-    "carId": "rayff1600",
+    "trackId": "nurburgring nordschleifetourist",
+    "carId": "raygr22",
     "wet": true,
     "bronze": "10:00.000", "silver": "9:20.000", "gold": "9:07.500"
   }
