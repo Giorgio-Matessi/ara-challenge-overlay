@@ -1,0 +1,30 @@
+// The 20 ARA challenges, embedded into the exe at build time.
+//
+// trackId is iRacing's WeekendInfo:TrackName  (e.g. "limerock full", "spa gp")
+// carId   is iRacing's DriverInfo:CarPath     (e.g. "mx5 mx52016")
+//
+// These are the sim's internal ids, NOT the display names. If a challenge never lights up,
+// load that track+car and read the real pair off the overlay's "no challenge here" line
+// (or use the tray icon's "Copy current track/car ID"), then correct this file.
+//
+// Times are "M:SS.fff" and must satisfy gold < silver < bronze; the tests enforce that.
+[
+  {
+    "number": 1,
+    "name": "Lime Rock Park — Global Mazda MX-5 Cup",
+    "trackId": "limerock full",
+    "carId": "mx5 mx52016",
+    "gold": "0:53.500",
+    "silver": "0:54.200",
+    "bronze": "0:55.000"
+  },
+  {
+    "number": 2,
+    "name": "Circuit de Spa-Francorchamps — Formula Vee",
+    "trackId": "spa gp",
+    "carId": "fvee",
+    "gold": "3:12.000",
+    "silver": "3:15.000",
+    "bronze": "3:18.000"
+  }
+]
