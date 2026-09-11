@@ -1,0 +1,8 @@
+{
+  // challenges.json carries a comment header. System.Text.Json reads it with
+  // JsonCommentHandling.Skip, so the comments are fine — this just stops the
+  // editor flagging them against strict JSON.
+  "files.associations": {
+    "challenges.json": "jsonc"
+  }
+}
