@@ -166,7 +166,7 @@ public partial class MainWindow : Window
             GoldTime.Text = TimeFormat.Format(challenge.GoldSeconds);
             SilverTime.Text = TimeFormat.Format(challenge.SilverSeconds);
             BronzeTime.Text = TimeFormat.Format(challenge.BronzeSeconds);
-            UpdateHeldMarks();
+            UpdateHeldMarks(challenge);
             StatusText.Text = "";
         }
         else
@@ -178,11 +178,9 @@ public partial class MainWindow : Window
         }
     }
 
-    private void UpdateHeldMarks()
+    private void UpdateHeldMarks(Challenge challenge)
     {
-        var held = _sdk.Challenge is { } c
-            ? _progress.Get(c.Number)?.BestMedal ?? Medal.None
-            : Medal.None;
+        var held = _progress.Get(challenge.Number)?.BestMedal ?? Medal.None;
 
         GoldMark.Text = held >= Medal.Gold ? "✓" : "";
         SilverMark.Text = held >= Medal.Silver ? "✓" : "";
@@ -212,7 +210,7 @@ public partial class MainWindow : Window
 
         var medal = challenge.MedalFor(lap.Seconds);
         var earnedNewTier = _progress.RecordLap(challenge.Number, lap.Seconds, medal);
-        UpdateHeldMarks();
+        UpdateHeldMarks(challenge);
 
         var held = _progress.Get(challenge.Number)?.BestMedal ?? Medal.None;
         var chasing = Challenge.NextTierAbove(held);

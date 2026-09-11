@@ -2,9 +2,18 @@ using System.Text.Json.Serialization;
 
 namespace AraOverlay.Core;
 
+/// <summary>Ordered so that a higher tier compares greater, and so that +1 is the tier above.</summary>
+public enum Medal
+{
+    None = 0,
+    Bronze = 1,
+    Silver = 2,
+    Gold = 3,
+}
+
 /// <summary>
-/// One ARA challenge: a fixed track + car, with three lap-time targets.
-/// Times are authored as strings ("1:23.456") and parsed on first use.
+/// One ARA challenge: a fixed track + car + conditions, with three lap-time targets.
+/// Times are authored as strings ("1:23.456") so challenges.json stays hand-editable.
 /// </summary>
 public sealed class Challenge
 {
@@ -35,39 +44,36 @@ public sealed class Challenge
     public string Silver { get; init; } = "";
     public string Bronze { get; init; } = "";
 
-    private double? _gold, _silver, _bronze;
+    [JsonIgnore] public double GoldSeconds => TimeFormat.Parse(Gold);
+    [JsonIgnore] public double SilverSeconds => TimeFormat.Parse(Silver);
+    [JsonIgnore] public double BronzeSeconds => TimeFormat.Parse(Bronze);
 
-    [JsonIgnore] public double GoldSeconds => _gold ??= TimeFormat.Parse(Gold);
-    [JsonIgnore] public double SilverSeconds => _silver ??= TimeFormat.Parse(Silver);
-    [JsonIgnore] public double BronzeSeconds => _bronze ??= TimeFormat.Parse(Bronze);
+    /// <summary>Tiers fastest first, which is also the order a lap is tested against them.</summary>
+    private (Medal Medal, double Seconds)[] Tiers =>
+        [(Medal.Gold, GoldSeconds), (Medal.Silver, SilverSeconds), (Medal.Bronze, BronzeSeconds)];
 
     /// <summary>The best medal this lap time earns, or <see cref="Medal.None"/>.</summary>
     public Medal MedalFor(double lapSeconds)
     {
         if (lapSeconds <= 0) return Medal.None;   // -1 is the SDK's "no lap yet"
-        if (Beats(lapSeconds, GoldSeconds)) return Medal.Gold;
-        if (Beats(lapSeconds, SilverSeconds)) return Medal.Silver;
-        if (Beats(lapSeconds, BronzeSeconds)) return Medal.Bronze;
+
+        foreach (var (medal, seconds) in Tiers)
+            if (lapSeconds <= seconds + DisplayTolerance) return medal;
+
         return Medal.None;
     }
 
     /// <summary>Threshold in seconds for a tier. <see cref="Medal.None"/> has no threshold.</summary>
-    public double TargetFor(Medal medal) => medal switch
+    public double TargetFor(Medal medal)
     {
-        Medal.Gold => GoldSeconds,
-        Medal.Silver => SilverSeconds,
-        Medal.Bronze => BronzeSeconds,
-        _ => throw new ArgumentOutOfRangeException(nameof(medal), medal, "No threshold for this tier."),
-    };
+        foreach (var tier in Tiers)
+            if (tier.Medal == medal) return tier.Seconds;
+
+        throw new ArgumentOutOfRangeException(nameof(medal), medal, "No threshold for this tier.");
+    }
 
     /// <summary>The tier a driver is chasing next, or null once they hold gold.</summary>
-    public static Medal? NextTierAbove(Medal held) => held switch
-    {
-        Medal.None => Medal.Bronze,
-        Medal.Bronze => Medal.Silver,
-        Medal.Silver => Medal.Gold,
-        _ => null,
-    };
+    public static Medal? NextTierAbove(Medal held) => held == Medal.Gold ? null : held + 1;
 
     /// <summary>Throws if the three times aren't strictly ordered — catches a typo at load time.</summary>
     public void Validate()
@@ -77,6 +83,4 @@ public sealed class Challenge
                 $"Challenge {Number} ('{Name}') has times out of order: " +
                 $"gold {Gold}, silver {Silver}, bronze {Bronze}.");
     }
-
-    private static bool Beats(double lap, double target) => lap <= target + DisplayTolerance;
 }
