@@ -127,6 +127,12 @@ public partial class MainWindow : Window
         };
     }
 
+    /// <summary>The four outcomes a lap can have, walked in turn so each one gets rendered.</summary>
+    private static readonly Medal[] DemoTiers = [Medal.None, Medal.Bronze, Medal.Silver, Medal.Gold];
+
+    /// <summary>A lap just inside the tier's threshold, so it earns that medal and no better.</summary>
+    private static double DemoLap(Challenge challenge, Medal medal) => challenge.TargetFor(medal) - 0.05;
+
     /// <summary>
     /// Renders every challenge in turn with no sim attached, so the overlay can be looked at —
     /// and its longest names checked for wrapping — on a machine that can't run iRacing.
@@ -141,19 +147,23 @@ public partial class MainWindow : Window
         var demo = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
         demo.Tick += (_, _) =>
         {
-            var challenge = challenges[step / 2 % challenges.Count];
+            var index = step / 2 % challenges.Count;
+            var challenge = challenges[index];
+            var medal = DemoTiers[index % DemoTiers.Length];
 
             // Alternate panel and banner, so both states get looked at for every challenge.
             if (step % 2 == 0)
             {
                 HideBanner();
                 Root.Visibility = Visibility.Visible;
-                ShowChallenge(challenge);
-                StatusText.Text = $"demo   lap  {TimeFormat.Format(challenge.GoldSeconds + 1.234)}";
+                ShowChallenge(challenge, medal);
+                StatusText.Text = medal == Medal.None
+                    ? $"demo   lap  {TimeFormat.Format(challenge.BronzeSeconds + 1.234)}   no medal"
+                    : $"demo   lap  {TimeFormat.Format(DemoLap(challenge, medal))}";
             }
-            else
+            else if (medal != Medal.None)
             {
-                ShowBanner(Medal.Gold, challenge.GoldSeconds - 0.05, challenge);
+                ShowBanner(medal, DemoLap(challenge, medal), challenge);
             }
 
             step++;
@@ -201,7 +211,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ShowChallenge(Challenge challenge)
+    private void ShowChallenge(Challenge challenge, Medal? held = null)
     {
         TitleText.Text = $"CHALLENGE {challenge.Number}{(challenge.Wet ? "  ·  WET" : "")}";
         TrackText.Text = challenge.Track;
@@ -211,16 +221,16 @@ public partial class MainWindow : Window
         GoldTime.Text = TimeFormat.Format(challenge.GoldSeconds);
         SilverTime.Text = TimeFormat.Format(challenge.SilverSeconds);
         BronzeTime.Text = TimeFormat.Format(challenge.BronzeSeconds);
-        UpdateHeldMarks(challenge);
+        UpdateHeldMarks(challenge, held);
     }
 
-    private void UpdateHeldMarks(Challenge challenge)
+    private void UpdateHeldMarks(Challenge challenge, Medal? held = null)
     {
-        var held = _progress.Get(challenge.Number)?.BestMedal ?? Medal.None;
+        var medal = held ?? _progress.Get(challenge.Number)?.BestMedal ?? Medal.None;
 
-        GoldMark.Text = held >= Medal.Gold ? "✓" : "";
-        SilverMark.Text = held >= Medal.Silver ? "✓" : "";
-        BronzeMark.Text = held >= Medal.Bronze ? "✓" : "";
+        GoldMark.Text = medal >= Medal.Gold ? "✓" : "";
+        SilverMark.Text = medal >= Medal.Silver ? "✓" : "";
+        BronzeMark.Text = medal >= Medal.Bronze ? "✓" : "";
     }
 
     private void OnTick(double currentLapSeconds, bool clean, string reason)
