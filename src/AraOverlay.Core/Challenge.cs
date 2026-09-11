@@ -71,13 +71,13 @@ public sealed class Challenge
     }
 
     /// <summary>Threshold in seconds for a tier. <see cref="Medal.None"/> has no threshold.</summary>
-    public double TargetFor(Medal medal)
+    public double TargetFor(Medal medal) => medal switch
     {
-        foreach (var tier in Tiers)
-            if (tier.Medal == medal) return tier.Seconds;
-
-        throw new ArgumentOutOfRangeException(nameof(medal), medal, "No threshold for this tier.");
-    }
+        Medal.Gold => GoldSeconds,
+        Medal.Silver => SilverSeconds,
+        Medal.Bronze => BronzeSeconds,
+        _ => throw new ArgumentOutOfRangeException(nameof(medal), medal, "No threshold for this tier."),
+    };
 
     /// <summary>The tier a driver is chasing next, or null once they hold gold.</summary>
     public static Medal? NextTierAbove(Medal held) => held == Medal.Gold ? null : held + 1;

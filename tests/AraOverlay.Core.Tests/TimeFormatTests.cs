@@ -56,13 +56,4 @@ public class TimeFormatTests
     {
         Assert.Equal(text, TimeFormat.Format(TimeFormat.Parse(text)));
     }
-
-    [Theory]
-    [InlineData(-0.312, "-0.312")]
-    [InlineData(1.204, "+1.204")]
-    [InlineData(0.0, "+0.000")]
-    public void FormatDelta_AlwaysCarriesASign(double seconds, string expected)
-    {
-        Assert.Equal(expected, TimeFormat.FormatDelta(seconds));
-    }
 }

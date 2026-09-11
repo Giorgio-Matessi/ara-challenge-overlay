@@ -72,24 +72,21 @@ public sealed class SdkService : IDisposable
     private void HandleSessionInfo()
     {
         int track = 0, car = 0;
-        string trackName = "", carName = "";
+        TrackName = CarName = "";
         try
         {
             var info = _sdk.Data.SessionInfo;
             track = info.WeekendInfo.TrackID;
-            trackName = info.WeekendInfo.TrackName ?? "";
+            TrackName = info.WeekendInfo.TrackName ?? "";
 
             var me = info.DriverInfo.Drivers.FirstOrDefault(d => d.CarIdx == info.DriverInfo.DriverCarIdx);
             car = me?.CarID ?? 0;
-            carName = me?.CarPath ?? "";
+            CarName = me?.CarPath ?? "";
         }
         catch (Exception)
         {
             // Session info we can't read means no match; the overlay just shows nothing.
         }
-
-        TrackName = trackName;
-        CarName = carName;
 
         if (track == TrackId && car == CarId) return;
 

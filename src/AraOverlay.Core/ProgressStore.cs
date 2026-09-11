@@ -19,8 +19,6 @@ public sealed class ProgressStore
         _progress = JsonFile.Load<Dictionary<int, ChallengeProgress>>(path) ?? new();
     }
 
-    public static string DefaultPath => JsonFile.PathIn("progress.json");
-
     public ChallengeProgress? Get(int challengeNumber) => _progress.GetValueOrDefault(challengeNumber);
 
     /// <summary>

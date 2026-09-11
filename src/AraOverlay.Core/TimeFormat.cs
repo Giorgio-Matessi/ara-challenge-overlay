@@ -43,8 +43,4 @@ public static class TimeFormat
         var rest = total - minutes * 60;
         return string.Format(CultureInfo.InvariantCulture, "{0}:{1:00.000}", minutes, rest);
     }
-
-    /// <summary>Renders a gap as "+1.204" / "-0.312" for the overlay's delta line.</summary>
-    public static string FormatDelta(double seconds) =>
-        seconds.ToString("+0.000;-0.000", CultureInfo.InvariantCulture);
 }

@@ -3,10 +3,7 @@ namespace AraOverlay.Core;
 /// <summary>iRacing's irsdk_TrackLocation values, as read from PlayerTrackSurface.</summary>
 public static class TrackSurface
 {
-    public const int NotInWorld = -1;
     public const int OffTrack = 0;
-    public const int InPitStall = 1;
-    public const int ApproachingPits = 2;
     public const int OnTrack = 3;
 }
 

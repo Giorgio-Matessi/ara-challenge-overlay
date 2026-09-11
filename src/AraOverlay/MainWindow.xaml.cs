@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Media;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -11,7 +12,6 @@ using Forms = System.Windows.Forms;
 // collide with WPF's types of the same name. This file wants the WPF ones; WinForms is
 // reached through the Forms alias above.
 using Application = System.Windows.Application;
-using Clipboard = System.Windows.Clipboard;
 using Color = System.Windows.Media.Color;
 
 namespace AraOverlay;
@@ -27,7 +27,7 @@ public partial class MainWindow : Window
     [DllImport("user32.dll")] private static extern int SetWindowLong(IntPtr hWnd, int index, int value);
 
     private readonly Settings _settings = Settings.Load();
-    private readonly ProgressStore _progress = new(ProgressStore.DefaultPath);
+    private readonly ProgressStore _progress = new(JsonFile.PathIn("progress.json"));
     private readonly SdkService _sdk = new();
     private readonly DispatcherTimer _bannerTimer = new() { Interval = TimeSpan.FromSeconds(8) };
 
@@ -58,13 +58,6 @@ public partial class MainWindow : Window
         ApplyWindowStyles();
         BuildTrayIcon();
         _sdk.Start();
-    }
-
-    protected override void OnClosed(EventArgs e)
-    {
-        _sdk.Dispose();
-        if (_tray is not null) { _tray.Visible = false; _tray.Dispose(); }
-        base.OnClosed(e);
     }
 
     // ---- window behaviour -------------------------------------------------
@@ -119,7 +112,6 @@ public partial class MainWindow : Window
 
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add(_lockItem);
-        menu.Items.Add(new Forms.ToolStripMenuItem("Copy current track/car ID", null, (_, _) => CopyIds()));
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add(new Forms.ToolStripMenuItem("Exit", null, (_, _) => Quit()));
 
@@ -130,25 +122,6 @@ public partial class MainWindow : Window
             Visible = true,
             ContextMenuStrip = menu,
         };
-    }
-
-    /// <summary>
-    /// The calibration knob: puts the sim's real ids on the clipboard so a wrong trackId/carId
-    /// in challenges.json can be corrected without guessing.
-    /// </summary>
-    private void CopyIds()
-    {
-        try
-        {
-            Clipboard.SetText(
-                $"\"trackIds\": [{_sdk.TrackId}],   // {_sdk.TrackName}\n" +
-                $"\"carId\": {_sdk.CarId},   // {_sdk.CarName}\n" +
-                (_sdk.IsWet ? "\"wet\": true,\n" : ""));
-        }
-        catch (COMException)
-        {
-            // Another process had the clipboard locked. Nothing worth reporting mid-session.
-        }
     }
 
     // ---- rendering --------------------------------------------------------
@@ -230,7 +203,7 @@ public partial class MainWindow : Window
 
         _lastLapLine = chasing is { } next
             ? $"last {TimeFormat.Format(lap.Seconds)}  {next.ToString().ToLowerInvariant()} " +
-              $"{TimeFormat.FormatDelta(lap.Seconds - challenge.TargetFor(next))}"
+              $"{(lap.Seconds - challenge.TargetFor(next)).ToString("+0.000;-0.000", CultureInfo.InvariantCulture)}"
             : $"last {TimeFormat.Format(lap.Seconds)}  gold held";
 
         if (earnedNewTier) ShowBanner(medal, lap.Seconds, challenge);
@@ -238,8 +211,8 @@ public partial class MainWindow : Window
 
     private void Quit()
     {
-        // ShutdownMode is OnExplicitShutdown, so the window's OnClosed never runs — clean up here
-        // or the tray icon lingers as a ghost until someone mouses over it.
+        // ShutdownMode is OnExplicitShutdown, so closing the window doesn't end the app and this
+        // is the only teardown path. Miss it and the tray icon lingers as a ghost.
         if (_tray is not null) { _tray.Visible = false; _tray.Dispose(); _tray = null; }
         _sdk.Dispose();
         Application.Current.Shutdown();
