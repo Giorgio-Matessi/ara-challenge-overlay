@@ -25,12 +25,15 @@ public sealed class ChallengeCatalog
         foreach (var challenge in challenges)
         {
             challenge.Validate();
-            var key = (challenge.TrackId, challenge.CarId, challenge.Wet);
-            if (!_byCombination.TryAdd(key, challenge))
-                throw new InvalidDataException(
-                    $"Challenges {_byCombination[key].Number} and {challenge.Number} share the same " +
-                    $"track+car+conditions ({challenge.TrackId} / {challenge.CarId} / " +
-                    $"{(challenge.Wet ? "wet" : "dry")}). The overlay could not tell them apart.");
+            foreach (var trackId in challenge.TrackIds)
+            {
+                var key = (trackId, challenge.CarId, challenge.Wet);
+                if (!_byCombination.TryAdd(key, challenge))
+                    throw new InvalidDataException(
+                        $"Challenges {_byCombination[key].Number} and {challenge.Number} share the same " +
+                        $"track+car+conditions ({trackId} / {challenge.CarId} / " +
+                        $"{(challenge.Wet ? "wet" : "dry")}). The overlay could not tell them apart.");
+            }
         }
     }
 

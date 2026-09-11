@@ -28,8 +28,12 @@ public sealed class Challenge
     public int Number { get; init; }
     public string Name { get; init; } = "";
 
-    /// <summary>iRacing's WeekendInfo:TrackID — the layout, not the track package.</summary>
-    public int TrackId { get; init; }
+    /// <summary>
+    /// iRacing's WeekendInfo:TrackID — the layout, not the track package. Usually one, but a
+    /// challenge can be run on more than one build of the same circuit: #11 and #18 accept
+    /// either Spa layout.
+    /// </summary>
+    public int[] TrackIds { get; init; } = [];
 
     /// <summary>iRacing's DriverInfo:Drivers:CarID.</summary>
     public int CarId { get; init; }
@@ -75,9 +79,12 @@ public sealed class Challenge
     /// <summary>The tier a driver is chasing next, or null once they hold gold.</summary>
     public static Medal? NextTierAbove(Medal held) => held == Medal.Gold ? null : held + 1;
 
-    /// <summary>Throws if the three times aren't strictly ordered — catches a typo at load time.</summary>
+    /// <summary>Throws on a row that can't work — catches a typo at load time, not mid-session.</summary>
     public void Validate()
     {
+        if (TrackIds.Length == 0)
+            throw new InvalidDataException($"Challenge {Number} ('{Name}') has no trackIds.");
+
         if (!(GoldSeconds < SilverSeconds && SilverSeconds < BronzeSeconds))
             throw new InvalidDataException(
                 $"Challenge {Number} ('{Name}') has times out of order: " +

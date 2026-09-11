@@ -1,6 +1,7 @@
 // The 20 ARA challenges, embedded into the exe at build time.
 //
-// trackId is iRacing's WeekendInfo:TrackID  — the layout, not the track package
+// trackIds is iRacing's WeekendInfo:TrackID — the layout, not the track package. More than
+//         one means the challenge counts on any of them: 11 and 18 accept either Spa build.
 // carId   is iRacing's DriverInfo:CarID
 // wet     marks the wet-weather challenges (16-20). Track and car alone are not enough:
 //         14 and 19 are the same car on the same Le Mans layout, dry and wet.
@@ -10,105 +11,105 @@
   {
     "number": 1,
     "name": "Snetterton Circuit (100) — Formula Vee Classic",
-    "trackId": 299,
+    "trackIds": [299],
     "carId": 142,
     "bronze": "0:49.899", "silver": "0:49.599", "gold": "0:49.299"
   },
   {
     "number": 2,
     "name": "Oulton Park (Fosters) — Global Mazda MX-5 Cup",
-    "trackId": 181,
+    "trackIds": [181],
     "carId": 67,
     "bronze": "1:07.100", "silver": "1:06.600", "gold": "1:06.100"
   },
   {
     "number": 3,
     "name": "Summit Point Raceway — Toyota GR86",
-    "trackId": 9,
+    "trackIds": [9],
     "carId": 160,
     "bronze": "1:20.250", "silver": "1:19.450", "gold": "1:19.150"
   },
   {
     "number": 4,
     "name": "Okayama (Full Course) — Global Mazda MX-5 Cup",
-    "trackId": 166,
+    "trackIds": [166],
     "carId": 67,
     "bronze": "1:45.500", "silver": "1:44.700", "gold": "1:44.000"
   },
   {
     "number": 5,
     "name": "Laguna Seca (2026) — Ray FF1600",
-    "trackId": 586,
+    "trackIds": [586],
     "carId": 163,
     "bronze": "1:30.600", "silver": "1:30.000", "gold": "1:29.500"
   },
   {
     "number": 6,
     "name": "Tsukuba (2000 Full) — Porsche 911 Cup (992.2)",
-    "trackId": 324,
+    "trackIds": [324],
     "carId": 208,
     "bronze": "0:53.850", "silver": "0:53.000", "gold": "0:52.700"
   },
   {
     "number": 7,
     "name": "Oran Park (Grand Prix) — Global Mazda MX-5 Cup",
-    "trackId": 202,
+    "trackIds": [202],
     "carId": 67,
     "bronze": "1:15.500", "silver": "1:14.800", "gold": "1:14.300"
   },
   {
     "number": 8,
     "name": "Circuito de Navarra (Speed Circuit) — Ferrari 296 GT3",
-    "trackId": 515,
+    "trackIds": [515],
     "carId": 173,
     "bronze": "1:38.900", "silver": "1:37.200", "gold": "1:36.700"
   },
   {
     "number": 9,
     "name": "Rudskogen Motorsenter — Cadillac CTS-V Racecar",
-    "trackId": 451,
+    "trackIds": [451],
     "carId": 41,
     "bronze": "1:22.800", "silver": "1:21.800", "gold": "1:21.200"
   },
   {
     "number": 10,
     "name": "Lime Rock Park (Grand Prix) — Radical SR8",
-    "trackId": 353,
+    "trackIds": [353],
     "carId": 13,
     "bronze": "0:48.000", "silver": "0:47.400", "gold": "0:47.000"
   },
   {
     "number": 11,
     "name": "Spa-Francorchamps (Grand Prix Pits) — Dallara P217",
-    "trackId": 523,
+    "trackIds": [523, 163],
     "carId": 128,
     "bronze": "2:09.700", "silver": "2:08.700", "gold": "2:07.900"
   },
   {
     "number": 12,
     "name": "Virginia International Raceway (Full) — Porsche 911 Cup (992.2)",
-    "trackId": 465,
+    "trackIds": [465],
     "carId": 208,
     "bronze": "1:46.000", "silver": "1:45.000", "gold": "1:44.300"
   },
   {
     "number": 13,
     "name": "Sebring (International) — NASCAR Truck Silverado 2008",
-    "trackId": 95,
+    "trackIds": [95],
     "carId": 20,
     "bronze": "2:12.500", "silver": "2:11.250", "gold": "2:09.800"
   },
   {
     "number": 14,
     "name": "Le Mans (24 Heures du Mans) — Dallara P217",
-    "trackId": 268,
+    "trackIds": [268],
     "carId": 128,
     "bronze": "3:38.800", "silver": "3:37.000", "gold": "3:36.250"
   },
   {
     "number": 15,
     "name": "Nordschleife (Industriefahrten) — Radical SR8",
-    "trackId": 249,
+    "trackIds": [249],
     "carId": 13,
     "bronze": "6:24.500", "silver": "6:22.500", "gold": "6:19.500"
   },
@@ -117,7 +118,7 @@
   {
     "number": 16,
     "name": "Oran Park (Grand Prix) — Ray FF1600 · WET",
-    "trackId": 202,
+    "trackIds": [202],
     "carId": 163,
     "wet": true,
     "bronze": "1:17.000", "silver": "1:15.950", "gold": "1:15.450"
@@ -125,7 +126,7 @@
   {
     "number": 17,
     "name": "Summit Point Raceway — Global Mazda MX-5 Cup · WET",
-    "trackId": 9,
+    "trackIds": [9],
     "carId": 67,
     "wet": true,
     "bronze": "1:31.300", "silver": "1:30.300", "gold": "1:29.800"
@@ -133,7 +134,7 @@
   {
     "number": 18,
     "name": "Spa-Francorchamps (Grand Prix Pits) — Ferrari 296 GT3 · WET",
-    "trackId": 163,
+    "trackIds": [163, 523],
     "carId": 173,
     "wet": true,
     "bronze": "2:49.800", "silver": "2:48.600", "gold": "2:47.900"
@@ -141,7 +142,7 @@
   {
     "number": 19,
     "name": "Le Mans (24 Heures du Mans) — Dallara P217 · WET",
-    "trackId": 268,
+    "trackIds": [268],
     "carId": 128,
     "wet": true,
     "bronze": "4:13.700", "silver": "4:11.200", "gold": "4:10.200"
@@ -149,7 +150,7 @@
   {
     "number": 20,
     "name": "Nordschleife (Industriefahrten) — Ray FF1600 · WET",
-    "trackId": 249,
+    "trackIds": [249],
     "carId": 163,
     "wet": true,
     "bronze": "10:00.000", "silver": "9:20.000", "gold": "9:07.500"

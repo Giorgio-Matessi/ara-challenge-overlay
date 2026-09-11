@@ -8,7 +8,7 @@ public class MedalTests
     {
         Number = 1,
         Name = "Test Challenge",
-        TrackId = 299,
+        TrackIds = [299],
         CarId = 142,
         Gold = "0:53.500",
         Silver = "0:54.200",
