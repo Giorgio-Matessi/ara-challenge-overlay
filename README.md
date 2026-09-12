@@ -41,6 +41,8 @@ points, or touching pit lane invalidates the lap, and the overlay says which one
 
 Your best time and best medal per challenge live in
 `%APPDATA%\AraOverlay\progress.json`; window position and lock state in `settings.json` beside it.
+If the overlay ever stops responding to the sim, `errors.log` in the same folder records what the
+iRacing SDK threw — send it along with the report.
 The banner only fires when you *improve* a tier, so a second gold lap won't interrupt you again.
 
 ## The challenge list
