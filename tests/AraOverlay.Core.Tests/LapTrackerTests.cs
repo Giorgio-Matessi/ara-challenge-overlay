@@ -2,8 +2,16 @@ using AraOverlay.Core;
 
 namespace AraOverlay.Core.Tests;
 
+/// <summary>Covers turning telemetry frames into lap events, and what spoils a lap.</summary>
 public class LapTrackerTests
 {
+    /// <summary>Builds one frame, defaulting what isn't the point of the test.</summary>
+    /// <param name="lap">The lap counter.</param>
+    /// <param name="lastLapTime">LapLastLapTime; -1 means no lap yet.</param>
+    /// <param name="surface">PlayerTrackSurface.</param>
+    /// <param name="incidents">The running incident count.</param>
+    /// <param name="onPitRoad">Whether the car is in pit lane.</param>
+    /// <returns>The frame.</returns>
     private static TelemetryFrame Frame(
         int lap,
         double lastLapTime = -1,
@@ -12,7 +20,10 @@ public class LapTrackerTests
         bool onPitRoad = false)
         => new(lap, lastLapTime, surface, incidents, onPitRoad);
 
-    /// <summary>Pushes frames and returns everything the tracker emitted.</summary>
+    /// <summary>Pushes frames through the tracker.</summary>
+    /// <param name="tracker">The tracker under test.</param>
+    /// <param name="frames">The frames, in order.</param>
+    /// <returns>Everything it emitted.</returns>
     private static List<LapEvent> Pump(LapTracker tracker, params TelemetryFrame[] frames)
     {
         var events = new List<LapEvent>();
@@ -33,11 +44,11 @@ public class LapTrackerTests
     {
         var tracker = new LapTracker();
         var events = Pump(tracker,
-            Frame(1),                  // seed
             Frame(1),
-            Frame(2),                  // crossed the line; time hasn't landed yet
-            Frame(2, 54.321),          // time lands
-            Frame(2, 54.321),          // same value, must not re-fire
+            Frame(1),
+            Frame(2),
+            Frame(2, 54.321),
+            Frame(2, 54.321),
             Frame(2, 54.321));
 
         var e = Assert.Single(events);
@@ -51,7 +62,7 @@ public class LapTrackerTests
         var tracker = new LapTracker();
         var events = Pump(tracker,
             Frame(1),
-            Frame(2), Frame(2), Frame(2), Frame(2),   // iRacing bumps Lap before LapLastLapTime
+            Frame(2), Frame(2), Frame(2), Frame(2),
             Frame(2, 54.321));
 
         Assert.Equal(LapOutcome.Completed, Assert.Single(events).Outcome);
@@ -64,14 +75,14 @@ public class LapTrackerTests
         var events = Pump(tracker,
             Frame(1),
             Frame(1, surface: TrackSurface.OffTrack),
-            Frame(1),                                  // back on track, but the lap is spoiled
+            Frame(1),
             Frame(2),
             Frame(2, 54.321));
 
         var e = Assert.Single(events);
         Assert.Equal(LapOutcome.Invalidated, e.Outcome);
         Assert.Contains("off track", e.Reason, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(54.321, e.Seconds, 3);            // the time is still reported, just not valid
+        Assert.Equal(54.321, e.Seconds, 3);
     }
 
     [Fact]
@@ -79,7 +90,7 @@ public class LapTrackerTests
     {
         var tracker = new LapTracker();
         var events = Pump(tracker,
-            Frame(1, incidents: 2),                    // seed with a non-zero count
+            Frame(1, incidents: 2),
             Frame(1, incidents: 6),
             Frame(2, incidents: 6),
             Frame(2, 54.321, incidents: 6));
@@ -112,9 +123,9 @@ public class LapTrackerTests
             Frame(1),
             Frame(1, surface: TrackSurface.OffTrack),
             Frame(2),
-            Frame(2, 60.000),                          // lap 1 — spoiled
+            Frame(2, 60.000),
             Frame(3, 60.000),
-            Frame(3, 54.321));                         // lap 2 — clean
+            Frame(3, 54.321));
 
         Assert.Equal(2, events.Count);
         Assert.Equal(LapOutcome.Invalidated, events[0].Outcome);
@@ -128,12 +139,12 @@ public class LapTrackerTests
         var tracker = new LapTracker();
         var events = Pump(tracker,
             Frame(1),
-            Frame(2),                                          // line crossed, lap 1 was clean
-            Frame(2, surface: TrackSurface.OffTrack),          // lap 2 goes wrong straight away
-            Frame(2, 54.321));                                 // lap 1's time finally lands
+            Frame(2),
+            Frame(2, surface: TrackSurface.OffTrack),
+            Frame(2, 54.321));
 
         Assert.Equal(LapOutcome.Completed, Assert.Single(events).Outcome);
-        Assert.False(tracker.CurrentLapIsClean);               // ...but lap 2 is already spoiled
+        Assert.False(tracker.CurrentLapIsClean);
     }
 
     [Fact]
@@ -141,7 +152,7 @@ public class LapTrackerTests
     {
         var tracker = new LapTracker();
         var frames = new List<TelemetryFrame> { Frame(1), Frame(2) };
-        for (var i = 0; i < 300; i++) frames.Add(Frame(2));     // time never updates
+        for (var i = 0; i < 300; i++) frames.Add(Frame(2));
 
         var events = Pump(tracker, frames.ToArray());
         Assert.Empty(events);
@@ -157,9 +168,9 @@ public class LapTrackerTests
         var tracker = new LapTracker();
         var events = Pump(tracker,
             Frame(5),
-            Frame(6),                  // pending
-            Frame(1),                  // towed / session restarted
-            Frame(1, 54.321));         // stale time from before the reset must not fire
+            Frame(6),
+            Frame(1),
+            Frame(1, 54.321));
 
         Assert.Empty(events);
     }

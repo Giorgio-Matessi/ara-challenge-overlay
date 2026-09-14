@@ -2,6 +2,7 @@ using AraOverlay.Core;
 
 namespace AraOverlay.Core.Tests;
 
+/// <summary>Covers parsing and rendering lap times.</summary>
 public class TimeFormatTests
 {
     [Theory]
@@ -24,8 +25,8 @@ public class TimeFormatTests
     [InlineData("1:2:3")]
     [InlineData("-5")]
     [InlineData("1:-3.0")]
-    [InlineData("1:75.000")]   // seconds component must be < 60
-    [InlineData(":45.0")]      // missing minutes
+    [InlineData("1:75.000")]
+    [InlineData(":45.0")]
     public void Parse_RejectsGarbage(string text)
     {
         Assert.Throws<FormatException>(() => { TimeFormat.Parse(text); });

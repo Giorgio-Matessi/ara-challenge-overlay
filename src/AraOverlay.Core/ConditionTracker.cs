@@ -14,11 +14,8 @@ public static class TrackWetness
 }
 
 /// <summary>
-/// Decides whether the session counts as wet, since challenges 16-20 are the wet versions of a
-/// track+car pair and #14/#19 are the same car on the same layout in different conditions.
-///
-/// The two thresholds are deliberately different: a track drying out passes through the middle
-/// of the range, and a single threshold there would flip the active challenge back and forth.
+/// Decides whether a session counts as wet, which is part of what identifies a challenge. The
+/// two thresholds differ so a drying track can't flip the active challenge back and forth.
 /// </summary>
 public sealed class ConditionTracker
 {
@@ -27,12 +24,16 @@ public sealed class ConditionTracker
 
     public bool IsWet { get; private set; }
 
+    /// <summary>Returns to dry, for a new session or a lost connection.</summary>
     public void Reset() => IsWet = false;
 
-    /// <summary>Feeds one frame. Returns true on the frame the classification actually flips.</summary>
+    /// <summary>Feeds one telemetry frame.</summary>
+    /// <param name="trackWetness">The TrackWetness reading.</param>
+    /// <param name="declaredWet">WeatherDeclaredWet, which forces wet on its own.</param>
+    /// <returns>True on the frame the classification flips.</returns>
     public bool Update(int trackWetness, bool declaredWet)
     {
-        if (trackWetness == TrackWetness.Unknown && !declaredWet) return false;   // no reading yet
+        if (trackWetness == TrackWetness.Unknown && !declaredWet) return false;
 
         var wet = IsWet
             ? declaredWet || trackWetness > BecomesDryAt
