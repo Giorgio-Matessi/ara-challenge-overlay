@@ -232,16 +232,25 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>Swaps between the challenge rows and the single id listing.</summary>
+    /// <param name="matched">True for the challenge panel, false for the ids.</param>
+    private void SetRowsVisible(bool matched)
+    {
+        var rows = matched ? Visibility.Visible : Visibility.Collapsed;
+
+        TrackText.Visibility = CarText.Visibility = rows;
+        HeaderDivider1.Visibility = HeaderDivider2.Visibility = rows;
+        GoalRow.Visibility = DeltaRow.Visibility = rows;
+        LapRow.Visibility = Targets.Visibility = rows;
+        StatusText.Visibility = matched ? Visibility.Collapsed : Visibility.Visible;
+    }
+
     /// <summary>Shows the ids the sim reported, for a track and car matching no challenge.</summary>
     /// <param name="detail">The lines to print under the title.</param>
     private void ShowUnmatched(string detail)
     {
         TitleText.Text = "NO ARA CHALLENGE FOR THIS COMBINATION";
-        TrackText.Visibility = CarText.Visibility = Visibility.Collapsed;
-        HeaderDivider1.Visibility = HeaderDivider2.Visibility = Visibility.Collapsed;
-        GoalRow.Visibility = DeltaRow.Visibility = Visibility.Collapsed;
-        LapRow.Visibility = Targets.Visibility = Visibility.Collapsed;
-        StatusText.Visibility = Visibility.Visible;
+        SetRowsVisible(false);
         StatusText.Text = detail;
     }
 
@@ -254,67 +263,57 @@ public partial class MainWindow : Window
         TrackText.Text = challenge.Track.ToUpperInvariant();
         CarText.Text = challenge.Car.ToUpperInvariant();
 
-        TrackText.Visibility = CarText.Visibility = Visibility.Visible;
-        HeaderDivider1.Visibility = HeaderDivider2.Visibility = Visibility.Visible;
-        GoalRow.Visibility = DeltaRow.Visibility = Visibility.Visible;
-        LapRow.Visibility = Targets.Visibility = Visibility.Visible;
-        StatusText.Visibility = Visibility.Collapsed;
+        SetRowsVisible(true);
 
         GoldTime.Text = TimeFormat.Format(challenge.GoldSeconds);
         SilverTime.Text = TimeFormat.Format(challenge.SilverSeconds);
         BronzeTime.Text = TimeFormat.Format(challenge.BronzeSeconds);
 
-        UpdateHeldMarks(challenge, held);
-        UpdateGoalAndDelta(challenge, held);
-        UpdateLapRow();
+        UpdateLiveRows(challenge, held ?? HeldMedal(challenge));
     }
 
+    /// <summary>Reads the best medal stored against a challenge.</summary>
+    /// <param name="challenge">The challenge to look up.</param>
+    /// <returns>The stored medal, or None.</returns>
+    private Medal HeldMedal(Challenge challenge) => _progress.Get(challenge.Number)?.BestMedal ?? Medal.None;
+
     /// <summary>
-    /// Sets the goal tier and the big delta between the last lap and that tier's target. Once
-    /// gold is held the goal stays gold, so the delta keeps meaning something.
+    /// Refills the rows that move as laps come in: the held ticks, the goal tier, the big delta
+    /// from the last lap to that tier's target, and the two lap times. Once gold is held the goal
+    /// stays gold, so the delta keeps meaning something.
     /// </summary>
     /// <param name="challenge">The challenge being shown.</param>
-    /// <param name="held">Which medal to treat as held; defaults to the stored progress.</param>
-    private void UpdateGoalAndDelta(Challenge challenge, Medal? held = null)
+    /// <param name="medal">The medal to treat as held.</param>
+    private void UpdateLiveRows(Challenge challenge, Medal medal)
     {
-        var medal = held ?? _progress.Get(challenge.Number)?.BestMedal ?? Medal.None;
+        GoldMark.Text = medal >= Medal.Gold ? "✓" : "";
+        SilverMark.Text = medal >= Medal.Silver ? "✓" : "";
+        BronzeMark.Text = medal >= Medal.Bronze ? "✓" : "";
+
         var goal = Challenge.NextTierAbove(medal) ?? Medal.Gold;
+        var target = challenge.TargetFor(goal);
 
         GoalTier.Text = goal.ToString().ToUpperInvariant();
         GoalTier.Foreground = (SolidColorBrush)FindResource(goal.ToString());
-        GoalTime.Text = TimeFormat.Format(challenge.TargetFor(goal));
+        GoalTime.Text = TimeFormat.Format(target);
+
+        SessionBestText.Text = _sdk.SessionBest is { } best ? TimeFormat.Format(best) : "—";
 
         if (_lastLap is not { } lap)
         {
+            LastLapText.Text = "—";
             DeltaText.Text = "—";
             DeltaText.Foreground = (SolidColorBrush)FindResource("Dim");
             return;
         }
 
-        var delta = lap - challenge.TargetFor(goal);
+        LastLapText.Text = TimeFormat.Format(lap);
+
+        var delta = lap - target;
         var behind = delta > 0;
 
         DeltaText.Text = delta.ToString("+0.000;-0.000", CultureInfo.InvariantCulture) + (behind ? "s ▼" : "s ▲");
         DeltaText.Foreground = (SolidColorBrush)FindResource(behind ? "Behind" : "Ahead");
-    }
-
-    /// <summary>Sets the last lap and session best times.</summary>
-    private void UpdateLapRow()
-    {
-        LastLapText.Text = _lastLap is { } lap ? TimeFormat.Format(lap) : "—";
-        SessionBestText.Text = _sdk.SessionBest is { } best ? TimeFormat.Format(best) : "—";
-    }
-
-    /// <summary>Ticks every tier at or below the medal held.</summary>
-    /// <param name="challenge">The challenge whose progress to read.</param>
-    /// <param name="held">Which medal to treat as held; defaults to the stored progress.</param>
-    private void UpdateHeldMarks(Challenge challenge, Medal? held = null)
-    {
-        var medal = held ?? _progress.Get(challenge.Number)?.BestMedal ?? Medal.None;
-
-        GoldMark.Text = medal >= Medal.Gold ? "✓" : "";
-        SilverMark.Text = medal >= Medal.Silver ? "✓" : "";
-        BronzeMark.Text = medal >= Medal.Bronze ? "✓" : "";
     }
 
     /// <summary>
@@ -355,9 +354,7 @@ public partial class MainWindow : Window
         var medal = challenge.MedalFor(lap.Seconds);
         var earnedNewTier = _progress.RecordLap(challenge.Number, lap.Seconds, medal);
 
-        UpdateHeldMarks(challenge);
-        UpdateGoalAndDelta(challenge);
-        UpdateLapRow();
+        UpdateLiveRows(challenge, HeldMedal(challenge));
 
         if (earnedNewTier) ShowBanner(medal, lap.Seconds, challenge);
     }
