@@ -38,7 +38,7 @@ public partial class MainWindow : Window
     private Forms.NotifyIcon? _tray;
     private Forms.ToolStripMenuItem? _lockItem;
     private IntPtr _hwnd;
-    private string _lastLapLine = "";
+    private double? _lastLap;
     private bool _demo;
 
     /// <summary>Restores the saved position and marshals the SDK's events onto the UI thread.</summary>
@@ -52,7 +52,7 @@ public partial class MainWindow : Window
         _bannerTimer.Tick += (_, _) => HideBanner();
 
         _sdk.StateChanged += () => Dispatcher.InvokeAsync(RenderState);
-        _sdk.Tick += (lapSeconds, clean, reason) => Dispatcher.InvokeAsync(() => OnTick(lapSeconds, clean, reason));
+        _sdk.Tick += live => Dispatcher.InvokeAsync(() => OnTick(live));
         _sdk.LapFinished += lap => Dispatcher.InvokeAsync(() => OnLapFinished(lap));
     }
 
@@ -158,19 +158,22 @@ public partial class MainWindow : Window
             var index = step / 2 % challenges.Count;
             var challenge = challenges[index];
             var medal = DemoTiers[index % DemoTiers.Length];
+            var lap = medal == Medal.None ? challenge.BronzeSeconds + 1.234 : DemoLap(challenge, medal);
 
             if (step % 2 == 0)
             {
                 HideBanner();
                 Root.Visibility = Visibility.Visible;
+
+                _lastLap = lap;
                 ShowChallenge(challenge, medal);
-                StatusText.Text = medal == Medal.None
-                    ? $"demo   lap  {TimeFormat.Format(challenge.BronzeSeconds + 1.234)}   no medal"
-                    : $"demo   lap  {TimeFormat.Format(DemoLap(challenge, medal))}";
+
+                SessionBestText.Text = TimeFormat.Format(lap - 0.35);
+                EstLapText.Text = TimeFormat.Format(lap + 0.12);
             }
             else if (medal != Medal.None)
             {
-                ShowBanner(medal, DemoLap(challenge, medal), challenge);
+                ShowBanner(medal, lap, challenge);
             }
 
             step++;
@@ -179,10 +182,7 @@ public partial class MainWindow : Window
         demo.Start();
 
         Root.Visibility = Visibility.Visible;
-        TitleText.Text = "No ARA challenge for this combination";
-        TrackText.Visibility = CarText.Visibility = Visibility.Collapsed;
-        Targets.Visibility = Visibility.Collapsed;
-        StatusText.Text = "track  0  \ncar    0  \ncond   dry";
+        ShowUnmatched("track  0  \ncar    0  \ncond   dry");
     }
 
     /// <summary>Loads the tray icon at the size Windows wants.</summary>
@@ -209,7 +209,7 @@ public partial class MainWindow : Window
     /// <summary>Redraws for the current session: hidden, the challenge panel, or the ids.</summary>
     private void RenderState()
     {
-        _lastLapLine = "";
+        _lastLap = null;
         HideBanner();
 
         if (!_sdk.Connected)
@@ -223,33 +223,86 @@ public partial class MainWindow : Window
         if (_sdk.Challenge is { } challenge)
         {
             ShowChallenge(challenge);
-            StatusText.Text = "";
         }
         else
         {
-            TitleText.Text = "No ARA challenge for this combination";
-            TrackText.Visibility = CarText.Visibility = Visibility.Collapsed;
-            Targets.Visibility = Visibility.Collapsed;
-            StatusText.Text = $"track  {_sdk.TrackId}  {_sdk.TrackName}\n" +
-                              $"car    {_sdk.CarId}  {_sdk.CarName}\n" +
-                              $"cond   {(_sdk.IsWet ? "wet" : "dry")}";
+            ShowUnmatched($"track  {_sdk.TrackId}  {_sdk.TrackName}\n" +
+                          $"car    {_sdk.CarId}  {_sdk.CarName}\n" +
+                          $"cond   {(_sdk.IsWet ? "wet" : "dry")}");
         }
     }
 
-    /// <summary>Fills the panel with a challenge's header and target times.</summary>
+    /// <summary>Shows the ids the sim reported, for a track and car matching no challenge.</summary>
+    /// <param name="detail">The lines to print under the title.</param>
+    private void ShowUnmatched(string detail)
+    {
+        TitleText.Text = "NO ARA CHALLENGE FOR THIS COMBINATION";
+        TrackText.Visibility = CarText.Visibility = Visibility.Collapsed;
+        HeaderDivider1.Visibility = HeaderDivider2.Visibility = Visibility.Collapsed;
+        GoalRow.Visibility = DeltaRow.Visibility = Visibility.Collapsed;
+        LapRow.Visibility = Targets.Visibility = Visibility.Collapsed;
+        StatusText.Visibility = Visibility.Visible;
+        StatusText.Text = detail;
+    }
+
+    /// <summary>Fills every row of the panel for a challenge.</summary>
     /// <param name="challenge">The challenge to show.</param>
-    /// <param name="held">Which medals to tick; defaults to the stored progress.</param>
+    /// <param name="held">Which medals to treat as held; defaults to the stored progress.</param>
     private void ShowChallenge(Challenge challenge, Medal? held = null)
     {
         TitleText.Text = $"CHALLENGE {challenge.Number}{(challenge.Wet ? "  ·  WET" : "")}";
-        TrackText.Text = challenge.Track;
-        CarText.Text = challenge.Car;
+        TrackText.Text = challenge.Track.ToUpperInvariant();
+        CarText.Text = challenge.Car.ToUpperInvariant();
+
         TrackText.Visibility = CarText.Visibility = Visibility.Visible;
-        Targets.Visibility = Visibility.Visible;
+        HeaderDivider1.Visibility = HeaderDivider2.Visibility = Visibility.Visible;
+        GoalRow.Visibility = DeltaRow.Visibility = Visibility.Visible;
+        LapRow.Visibility = Targets.Visibility = Visibility.Visible;
+        StatusText.Visibility = Visibility.Collapsed;
+
         GoldTime.Text = TimeFormat.Format(challenge.GoldSeconds);
         SilverTime.Text = TimeFormat.Format(challenge.SilverSeconds);
         BronzeTime.Text = TimeFormat.Format(challenge.BronzeSeconds);
+
         UpdateHeldMarks(challenge, held);
+        UpdateGoalAndDelta(challenge, held);
+        UpdateLapRow();
+    }
+
+    /// <summary>
+    /// Sets the goal tier and the big delta between the last lap and that tier's target. Once
+    /// gold is held the goal stays gold, so the delta keeps meaning something.
+    /// </summary>
+    /// <param name="challenge">The challenge being shown.</param>
+    /// <param name="held">Which medal to treat as held; defaults to the stored progress.</param>
+    private void UpdateGoalAndDelta(Challenge challenge, Medal? held = null)
+    {
+        var medal = held ?? _progress.Get(challenge.Number)?.BestMedal ?? Medal.None;
+        var goal = Challenge.NextTierAbove(medal) ?? Medal.Gold;
+
+        GoalTier.Text = goal.ToString().ToUpperInvariant();
+        GoalTier.Foreground = (SolidColorBrush)FindResource(goal.ToString());
+        GoalTime.Text = TimeFormat.Format(challenge.TargetFor(goal));
+
+        if (_lastLap is not { } lap)
+        {
+            DeltaText.Text = "—";
+            DeltaText.Foreground = (SolidColorBrush)FindResource("Dim");
+            return;
+        }
+
+        var delta = lap - challenge.TargetFor(goal);
+        var behind = delta > 0;
+
+        DeltaText.Text = delta.ToString("+0.000;-0.000", CultureInfo.InvariantCulture) + (behind ? "s ▼" : "s ✓");
+        DeltaText.Foreground = (SolidColorBrush)FindResource(behind ? "Behind" : "Ahead");
+    }
+
+    /// <summary>Sets the last lap and session best times.</summary>
+    private void UpdateLapRow()
+    {
+        LastLapText.Text = _lastLap is { } lap ? TimeFormat.Format(lap) : "—";
+        SessionBestText.Text = _sdk.SessionBest is { } best ? TimeFormat.Format(best) : "—";
     }
 
     /// <summary>Ticks every tier at or below the medal held.</summary>
@@ -264,19 +317,25 @@ public partial class MainWindow : Window
         BronzeMark.Text = medal >= Medal.Bronze ? "✓" : "";
     }
 
-    /// <summary>Updates the live lap line. Called per frame, so it only writes on change.</summary>
-    /// <param name="currentLapSeconds">The lap in progress; not positive before the first lap.</param>
-    /// <param name="clean">Whether the lap is still valid.</param>
-    /// <param name="reason">What spoiled it, when it isn't.</param>
-    private void OnTick(double currentLapSeconds, bool clean, string reason)
+    /// <summary>
+    /// Updates the estimated lap, which doubles as the warning line: a spoiled lap shows what
+    /// spoiled it instead of a projection it can no longer earn. Called per frame, so it only
+    /// writes on change.
+    /// </summary>
+    /// <param name="live">The lap in progress.</param>
+    private void OnTick(LiveLap live)
     {
         if (_sdk.Challenge is null) return;
 
-        var live = currentLapSeconds > 0 ? $"lap  {TimeFormat.Format(currentLapSeconds)}" : "lap  —";
-        if (!clean) live += $"   ! {reason}";
+        var text = live.Clean
+            ? live.EstimatedSeconds is { } estimate ? TimeFormat.Format(estimate) : "—"
+            : $"! {live.Reason}";
 
-        var text = _lastLapLine.Length == 0 ? live : live + "\n" + _lastLapLine;
-        if (StatusText.Text != text) StatusText.Text = text;
+        if (EstLapText.Text != text)
+        {
+            EstLapText.Text = text;
+            EstLapText.Foreground = (SolidColorBrush)FindResource(live.Clean ? "Ink" : "Behind");
+        }
     }
 
     /// <summary>Records a finished lap and pops the banner if it earned a new tier.</summary>
@@ -287,21 +346,18 @@ public partial class MainWindow : Window
 
         if (lap.Outcome == LapOutcome.Invalidated)
         {
-            _lastLapLine = $"last {TimeFormat.Format(lap.Seconds)}  INVALID ({lap.Reason})";
+            LastLapText.Text = $"{TimeFormat.Format(lap.Seconds)}  INVALID";
             return;
         }
 
+        _lastLap = lap.Seconds;
+
         var medal = challenge.MedalFor(lap.Seconds);
         var earnedNewTier = _progress.RecordLap(challenge.Number, lap.Seconds, medal);
+
         UpdateHeldMarks(challenge);
-
-        var held = _progress.Get(challenge.Number)?.BestMedal ?? Medal.None;
-        var chasing = Challenge.NextTierAbove(held);
-
-        _lastLapLine = chasing is { } next
-            ? $"last {TimeFormat.Format(lap.Seconds)}  {next.ToString().ToLowerInvariant()} " +
-              $"{(lap.Seconds - challenge.TargetFor(next)).ToString("+0.000;-0.000", CultureInfo.InvariantCulture)}"
-            : $"last {TimeFormat.Format(lap.Seconds)}  gold held";
+        UpdateGoalAndDelta(challenge);
+        UpdateLapRow();
 
         if (earnedNewTier) ShowBanner(medal, lap.Seconds, challenge);
     }
