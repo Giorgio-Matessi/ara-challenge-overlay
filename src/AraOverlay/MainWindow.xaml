@@ -17,16 +17,32 @@
         <SolidColorBrush x:Key="Gold"   Color="#F2C14E"/>
         <SolidColorBrush x:Key="Silver" Color="#C5CDD4"/>
         <SolidColorBrush x:Key="Bronze" Color="#C98B5E"/>
+        <SolidColorBrush x:Key="Behind" Color="#E4564A"/>
+        <SolidColorBrush x:Key="Ahead"  Color="#5BD16A"/>
+        <SolidColorBrush x:Key="Rule"   Color="#1AFFFFFF"/>
 
-        <Style x:Key="Tier" TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="Segoe UI"/>
-            <Setter Property="FontSize" Value="13"/>
+        <Style x:Key="Label" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe UI Semibold"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{StaticResource Dim}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
-        <Style x:Key="TierTime" TargetType="TextBlock" BasedOn="{StaticResource Tier}">
+        <Style x:Key="Value" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="Consolas"/>
             <Setter Property="FontSize" Value="15"/>
-            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="Foreground" Value="{StaticResource Ink}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="Row" TargetType="Border">
+            <Setter Property="BorderBrush" Value="{StaticResource Rule}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="Padding" Value="0,6"/>
+        </Style>
+        <Style x:Key="Divider" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource Rule}"/>
+            <Setter Property="Width" Value="1"/>
+            <Setter Property="Margin" Value="10,1"/>
         </Style>
     </Window.Resources>
 
@@ -36,62 +52,124 @@
         <Border x:Name="Panel"
                 Background="#D910181C"
                 CornerRadius="10"
-                Padding="14,11"
+                Padding="14,9"
                 BorderThickness="1"
                 BorderBrush="#20FFFFFF"
                 MouseLeftButtonDown="OnPanelDrag">
-            <StackPanel MinWidth="250">
+            <StackPanel MinWidth="330" MaxWidth="470">
 
-                <TextBlock x:Name="TitleText"
-                           Text="ARA Challenge Overlay"
-                           FontFamily="Segoe UI Semibold" FontSize="11"
-                           Foreground="{StaticResource Dim}"
-                           TextWrapping="Wrap" MaxWidth="300"/>
+                <!-- Challenge | track | car -->
+                <Border Style="{StaticResource Row}" Padding="0,0,0,6">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
 
-                <TextBlock x:Name="TrackText"
-                           Visibility="Collapsed"
-                           Margin="0,3,0,0"
-                           FontFamily="Segoe UI Semibold" FontSize="15"
-                           Foreground="{StaticResource Ink}"
-                           TextWrapping="Wrap" MaxWidth="300"/>
+                        <TextBlock x:Name="TitleText" Grid.Column="0" Style="{StaticResource Label}"
+                                   Foreground="{StaticResource Ink}" Text="ARA CHALLENGE OVERLAY"/>
+                        <Border x:Name="HeaderDivider1" Grid.Column="1" Style="{StaticResource Divider}"/>
+                        <TextBlock x:Name="TrackText" Grid.Column="2" Style="{StaticResource Label}"/>
+                        <Border x:Name="HeaderDivider2" Grid.Column="3" Style="{StaticResource Divider}"/>
+                        <TextBlock x:Name="CarText" Grid.Column="4" Style="{StaticResource Label}"/>
+                    </Grid>
+                </Border>
 
-                <TextBlock x:Name="CarText"
-                           Visibility="Collapsed"
-                           FontFamily="Segoe UI" FontSize="13"
-                           Foreground="{StaticResource Dim}"
-                           TextWrapping="Wrap" MaxWidth="300"/>
+                <!-- Goal | estimated lap -->
+                <Border x:Name="GoalRow" Style="{StaticResource Row}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                <Grid x:Name="Targets" Margin="0,9,0,0">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Label}" Text="GOAL" Margin="0,0,6,0"/>
+                            <TextBlock x:Name="GoalTier" Style="{StaticResource Label}"
+                                       Foreground="{StaticResource Ink}" Margin="0,0,6,0"/>
+                            <TextBlock x:Name="GoalTime" Style="{StaticResource Value}" Text="—"/>
+                        </StackPanel>
+
+                        <Border Grid.Column="1" Style="{StaticResource Divider}"/>
+
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                            <TextBlock Style="{StaticResource Label}" Text="EST. LAP" Margin="0,0,6,0"/>
+                            <TextBlock x:Name="EstLapText" Style="{StaticResource Value}" Text="—"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Last lap against the goal -->
+                <Border x:Name="DeltaRow" Style="{StaticResource Row}" Padding="0,7,0,9">
+                    <TextBlock x:Name="DeltaText"
+                               Text="—"
+                               FontFamily="Segoe UI Black" FontSize="34"
+                               Foreground="{StaticResource Dim}"
+                               HorizontalAlignment="Center"/>
+                </Border>
+
+                <!-- Last lap | session best -->
+                <Border x:Name="LapRow" Style="{StaticResource Row}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Label}" Text="LAST LAP" Margin="0,0,6,0"/>
+                            <TextBlock x:Name="LastLapText" Style="{StaticResource Value}" Text="—"/>
+                        </StackPanel>
+
+                        <Border Grid.Column="1" Style="{StaticResource Divider}"/>
+
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                            <TextBlock Style="{StaticResource Label}" Text="SESSION BEST" Margin="0,0,6,0"/>
+                            <TextBlock x:Name="SessionBestText" Style="{StaticResource Value}"
+                                       Foreground="{StaticResource Bronze}" Text="—"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- The three targets -->
+                <Grid x:Name="Targets" Margin="0,7,0,1">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*" MinWidth="14"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Row="0" Grid.Column="0" Text="GOLD"   Style="{StaticResource Tier}" Foreground="{StaticResource Gold}"/>
-                    <TextBlock Grid.Row="0" Grid.Column="2" x:Name="GoldTime"   Text="—" Style="{StaticResource TierTime}" Foreground="{StaticResource Gold}"/>
-                    <TextBlock Grid.Row="0" Grid.Column="3" x:Name="GoldMark"   Text="" MinWidth="18" Style="{StaticResource TierTime}" Foreground="{StaticResource Gold}"/>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource Label}" Foreground="{StaticResource Gold}" Text="GOLD" Margin="0,0,6,0"/>
+                        <TextBlock x:Name="GoldTime" Style="{StaticResource Value}" FontSize="13" Foreground="{StaticResource Gold}" Text="—"/>
+                        <TextBlock x:Name="GoldMark" Style="{StaticResource Value}" FontSize="13" Foreground="{StaticResource Gold}" Margin="4,0,0,0"/>
+                    </StackPanel>
 
-                    <TextBlock Grid.Row="1" Grid.Column="0" Text="SILVER" Style="{StaticResource Tier}" Foreground="{StaticResource Silver}"/>
-                    <TextBlock Grid.Row="1" Grid.Column="2" x:Name="SilverTime" Text="—" Style="{StaticResource TierTime}" Foreground="{StaticResource Silver}"/>
-                    <TextBlock Grid.Row="1" Grid.Column="3" x:Name="SilverMark" Text="" MinWidth="18" Style="{StaticResource TierTime}" Foreground="{StaticResource Silver}"/>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
+                        <TextBlock Style="{StaticResource Label}" Foreground="{StaticResource Silver}" Text="SILVER" Margin="0,0,6,0"/>
+                        <TextBlock x:Name="SilverTime" Style="{StaticResource Value}" FontSize="13" Foreground="{StaticResource Silver}" Text="—"/>
+                        <TextBlock x:Name="SilverMark" Style="{StaticResource Value}" FontSize="13" Foreground="{StaticResource Silver}" Margin="4,0,0,0"/>
+                    </StackPanel>
 
-                    <TextBlock Grid.Row="2" Grid.Column="0" Text="BRONZE" Style="{StaticResource Tier}" Foreground="{StaticResource Bronze}"/>
-                    <TextBlock Grid.Row="2" Grid.Column="2" x:Name="BronzeTime" Text="—" Style="{StaticResource TierTime}" Foreground="{StaticResource Bronze}"/>
-                    <TextBlock Grid.Row="2" Grid.Column="3" x:Name="BronzeMark" Text="" MinWidth="18" Style="{StaticResource TierTime}" Foreground="{StaticResource Bronze}"/>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                        <TextBlock Style="{StaticResource Label}" Foreground="{StaticResource Bronze}" Text="BRONZE" Margin="0,0,6,0"/>
+                        <TextBlock x:Name="BronzeTime" Style="{StaticResource Value}" FontSize="13" Foreground="{StaticResource Bronze}" Text="—"/>
+                        <TextBlock x:Name="BronzeMark" Style="{StaticResource Value}" FontSize="13" Foreground="{StaticResource Bronze}" Margin="4,0,0,0"/>
+                    </StackPanel>
                 </Grid>
 
+                <!-- Shown instead of the rows above when nothing matches -->
                 <TextBlock x:Name="StatusText"
-                           Margin="0,9,0,0"
+                           Visibility="Collapsed"
+                           Margin="0,7,0,1"
                            FontFamily="Consolas" FontSize="12"
                            Foreground="{StaticResource Dim}"
-                           TextWrapping="Wrap" MaxWidth="300"/>
+                           TextWrapping="Wrap"/>
             </StackPanel>
         </Border>
 

@@ -43,6 +43,7 @@ public sealed class LapTracker
 
     public bool CurrentLapIsClean => _clean;
     public string CurrentLapReason => _reason;
+    public double? SessionBestSeconds { get; private set; }
 
     /// <summary>Drops all state, so the next frame re-seeds.</summary>
     public void Reset()
@@ -51,6 +52,7 @@ public sealed class LapTracker
         _pending = false;
         _clean = true;
         _reason = "";
+        SessionBestSeconds = null;
     }
 
     /// <summary>Feeds one telemetry frame.</summary>
@@ -103,9 +105,14 @@ public sealed class LapTracker
         if (frame.LapLastLapTime > 0 && Math.Abs(frame.LapLastLapTime - _timeAtIncrement) > 1e-6)
         {
             _pending = false;
-            return _pendingClean
-                ? new LapEvent(LapOutcome.Completed, frame.LapLastLapTime, "")
-                : new LapEvent(LapOutcome.Invalidated, frame.LapLastLapTime, _pendingReason);
+
+            if (!_pendingClean)
+                return new LapEvent(LapOutcome.Invalidated, frame.LapLastLapTime, _pendingReason);
+
+            if (SessionBestSeconds is not { } best || frame.LapLastLapTime < best)
+                SessionBestSeconds = frame.LapLastLapTime;
+
+            return new LapEvent(LapOutcome.Completed, frame.LapLastLapTime, "");
         }
 
         if (++_pendingFrames > MaxPendingFrames) _pending = false;

@@ -6,6 +6,9 @@ using IRSDKSharper;
 
 namespace AraOverlay;
 
+/// <summary>The lap in progress, as the panel needs it.</summary>
+public readonly record struct LiveLap(double CurrentSeconds, double? EstimatedSeconds, bool Clean, string Reason);
+
 /// <summary>
 /// The only place that touches the iRacing SDK. Translates its callbacks into plain events and
 /// feeds the trackers; events fire on the SDK's thread, so callers marshal to the UI themselves.
@@ -32,10 +35,11 @@ public sealed class SdkService : IDisposable
     public string TrackName { get; private set; } = "";
     public string CarName { get; private set; } = "";
     public bool IsWet => _conditions.IsWet;
+    public double? SessionBest => _tracker.SessionBestSeconds;
     public Challenge? Challenge { get; private set; }
 
     public event Action? StateChanged;
-    public event Action<double, bool, string>? Tick;
+    public event Action<LiveLap>? Tick;
     public event Action<LapEvent>? LapFinished;
 
     /// <summary>Subscribes to the SDK and starts its background loops.</summary>
@@ -150,6 +154,29 @@ public sealed class SdkService : IDisposable
         }
     }
 
+    /// <summary>Projects the lap in progress, from iRacing's delta to its own session best.</summary>
+    /// <returns>The projected lap time, or null with no usable reference lap.</returns>
+    private double? EstimateLap()
+    {
+        // Its own try: these three names are still unverified against a live sim, and a bad one
+        // here would otherwise cost the whole frame, not just the estimate.
+        try
+        {
+            if (!_sdk.Data.GetBool("LapDeltaToSessionBestLap_OK")) return null;
+
+            var reference = _sdk.Data.GetFloat("LapBestLapTime");
+            if (reference <= 0) return null;
+
+            var estimate = reference + _sdk.Data.GetFloat("LapDeltaToSessionBestLap");
+            return estimate > 0 ? estimate : null;
+        }
+        catch (Exception e)
+        {
+            Log(e);
+            return null;
+        }
+    }
+
     /// <summary>Re-runs the lookup, for a session change or a flip between wet and dry.</summary>
     private void Rematch()
     {
@@ -179,7 +206,8 @@ public sealed class SdkService : IDisposable
 
             var completed = _tracker.Update(frame);
 
-            Tick?.Invoke(currentLap, _tracker.CurrentLapIsClean, _tracker.CurrentLapReason);
+            Tick?.Invoke(new LiveLap(
+                currentLap, EstimateLap(), _tracker.CurrentLapIsClean, _tracker.CurrentLapReason));
             if (completed is { } lap) LapFinished?.Invoke(lap);
         }
         catch (Exception e)

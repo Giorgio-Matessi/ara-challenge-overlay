@@ -199,4 +199,48 @@ public class LapTrackerTests
         Pump(tracker, Frame(2), Frame(2, 54.321));
         Assert.True(tracker.CurrentLapIsClean);
     }
+
+    [Fact]
+    public void SessionBestStartsEmpty()
+    {
+        Assert.Null(new LapTracker().SessionBestSeconds);
+    }
+
+    [Fact]
+    public void SessionBestTakesTheQuickestCleanLap()
+    {
+        var tracker = new LapTracker();
+        Pump(tracker,
+            Frame(1),
+            Frame(2), Frame(2, 55.000),
+            Frame(3), Frame(3, 54.100),
+            Frame(4), Frame(4, 54.800));
+
+        Assert.Equal(54.100, tracker.SessionBestSeconds!.Value, 3);
+    }
+
+    [Fact]
+    public void SessionBestIgnoresAnInvalidatedLap()
+    {
+        var tracker = new LapTracker();
+        Pump(tracker,
+            Frame(1),
+            Frame(1, surface: TrackSurface.OffTrack),
+            Frame(2), Frame(2, 51.000),
+            Frame(3), Frame(3, 54.500));
+
+        Assert.Equal(54.500, tracker.SessionBestSeconds!.Value, 3);
+    }
+
+    [Fact]
+    public void ResetClearsSessionBest()
+    {
+        var tracker = new LapTracker();
+        Pump(tracker, Frame(1), Frame(2), Frame(2, 54.321));
+        Assert.NotNull(tracker.SessionBestSeconds);
+
+        tracker.Reset();
+
+        Assert.Null(tracker.SessionBestSeconds);
+    }
 }
