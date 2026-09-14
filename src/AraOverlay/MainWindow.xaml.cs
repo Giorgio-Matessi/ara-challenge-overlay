@@ -294,7 +294,7 @@ public partial class MainWindow : Window
         var delta = lap - challenge.TargetFor(goal);
         var behind = delta > 0;
 
-        DeltaText.Text = delta.ToString("+0.000;-0.000", CultureInfo.InvariantCulture) + (behind ? "s ▼" : "s ✓");
+        DeltaText.Text = delta.ToString("+0.000;-0.000", CultureInfo.InvariantCulture) + (behind ? "s ▼" : "s ▲");
         DeltaText.Foreground = (SolidColorBrush)FindResource(behind ? "Behind" : "Ahead");
     }
 

@@ -29,7 +29,7 @@ On a challenge's track and car, the panel reads top to bottom:
 |---|---|
 | **Challenge / track / car** | Which challenge you've loaded. Wet challenges are marked. |
 | **Goal / est. lap** | The tier you're chasing next and its target, against a live projection of the lap you're on. Once the lap is spoiled this cell says what spoiled it instead. |
-| **The big number** | How far your last lap sat from the goal. Red and `▼` means there's still time to find; green and `✓` means you cleared it. |
+| **The big number** | How far your last lap sat from the goal. Red and `▼` means there's still time to find; green and `▲` means you cleared it. |
 | **Last lap / session best** | Your last completed lap, and the quickest clean one this session. |
 | **Gold / silver / bronze** | All three targets, with a ✓ on every medal you already hold. |
 
