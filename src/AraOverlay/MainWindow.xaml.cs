@@ -10,20 +10,22 @@ using System.Windows.Threading;
 using AraOverlay.Core;
 using Forms = System.Windows.Forms;
 
-// UseWindowsForms adds System.Windows.Forms and System.Drawing as implicit usings, which
-// collide with WPF's types of the same name. This file wants the WPF ones; WinForms is
-// reached through the Forms alias above.
 using Application = System.Windows.Application;
 using Color = System.Windows.Media.Color;
 
 namespace AraOverlay;
 
+/// <summary>
+/// The overlay window and its tray icon. Shows the active challenge's target times, the live lap,
+/// and a banner when a lap earns a new medal; hides itself when iRacing isn't running, and lists
+/// the ids the sim reported when the track and car match no challenge.
+/// </summary>
 public partial class MainWindow : Window
 {
     private const int GWL_EXSTYLE = -20;
-    private const int WS_EX_TOOLWINDOW = 0x00000080;   // keep it out of alt-tab
-    private const int WS_EX_TRANSPARENT = 0x00000020;  // clicks fall through to iRacing
-    private const int WS_EX_NOACTIVATE = 0x08000000;   // never steal focus from the sim
+    private const int WS_EX_TOOLWINDOW = 0x00000080;
+    private const int WS_EX_TRANSPARENT = 0x00000020;
+    private const int WS_EX_NOACTIVATE = 0x08000000;
 
     [DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr hWnd, int index);
     [DllImport("user32.dll")] private static extern int SetWindowLong(IntPtr hWnd, int index, int value);
@@ -36,9 +38,10 @@ public partial class MainWindow : Window
     private Forms.NotifyIcon? _tray;
     private Forms.ToolStripMenuItem? _lockItem;
     private IntPtr _hwnd;
-    private string _lastLapLine = "";
+    private double? _lastLap;
     private bool _demo;
 
+    /// <summary>Restores the saved position and marshals the SDK's events onto the UI thread.</summary>
     public MainWindow()
     {
         InitializeComponent();
@@ -48,12 +51,13 @@ public partial class MainWindow : Window
 
         _bannerTimer.Tick += (_, _) => HideBanner();
 
-        // The SDK calls back on its own thread; everything below must run on the UI thread.
         _sdk.StateChanged += () => Dispatcher.InvokeAsync(RenderState);
-        _sdk.Tick += (lapSeconds, clean, reason) => Dispatcher.InvokeAsync(() => OnTick(lapSeconds, clean, reason));
+        _sdk.Tick += live => Dispatcher.InvokeAsync(() => OnTick(live));
         _sdk.LapFinished += lap => Dispatcher.InvokeAsync(() => OnLapFinished(lap));
     }
 
+    /// <summary>Applies the window styles and tray icon, then starts the SDK or the demo.</summary>
+    /// <param name="e">Unused.</param>
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
@@ -65,8 +69,7 @@ public partial class MainWindow : Window
         else _sdk.Start();
     }
 
-    // ---- window behaviour -------------------------------------------------
-
+    /// <summary>Sets click-through for the current lock state and colours the panel border.</summary>
     private void ApplyWindowStyles()
     {
         var style = GetWindowLong(_hwnd, GWL_EXSTYLE) | WS_EX_TOOLWINDOW;
@@ -76,23 +79,25 @@ public partial class MainWindow : Window
 
         SetWindowLong(_hwnd, GWL_EXSTYLE, style);
 
-        // Unlocked gets a visible handle so it's obvious the overlay is draggable.
         Panel.BorderBrush = _settings.Locked
             ? new SolidColorBrush(Color.FromArgb(0x20, 0xFF, 0xFF, 0xFF))
             : new SolidColorBrush(Color.FromArgb(0xFF, 0x4C, 0xC2, 0xFF));
     }
 
+    /// <summary>Drags the overlay while unlocked, saving where it lands.</summary>
+    /// <param name="sender">The panel that was pressed.</param>
+    /// <param name="e">Unused.</param>
     private void OnPanelDrag(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
-        if (_settings.Locked) return;   // shouldn't fire while click-through, but belt and braces
+        if (_settings.Locked) return;
 
         try
         {
-            DragMove();                 // returns once the mouse is released
+            DragMove();
         }
         catch (InvalidOperationException)
         {
-            return;                     // button came up before we got here
+            return;
         }
 
         _settings.Left = Left;
@@ -100,6 +105,7 @@ public partial class MainWindow : Window
         _settings.Save();
     }
 
+    /// <summary>Flips click-through on or off and saves the choice.</summary>
     private void ToggleLock()
     {
         _settings.Locked = !_settings.Locked;
@@ -108,6 +114,7 @@ public partial class MainWindow : Window
         if (_lockItem is not null) _lockItem.Checked = _settings.Locked;
     }
 
+    /// <summary>Builds the tray icon and its menu.</summary>
     private void BuildTrayIcon()
     {
         _lockItem = new Forms.ToolStripMenuItem("Lock position (click-through)", null, (_, _) => ToggleLock())
@@ -129,19 +136,18 @@ public partial class MainWindow : Window
         };
     }
 
-    /// <summary>The four outcomes a lap can have, walked in turn so each one gets rendered.</summary>
     private static readonly Medal[] DemoTiers = [Medal.None, Medal.Bronze, Medal.Silver, Medal.Gold];
 
-    /// <summary>A lap just inside the tier's threshold, so it earns that medal and no better.</summary>
+    /// <summary>Invents a lap time for the demo.</summary>
+    /// <param name="challenge">The challenge being shown.</param>
+    /// <param name="medal">The tier the lap should earn.</param>
+    /// <returns>A time just inside that tier's threshold.</returns>
     private static double DemoLap(Challenge challenge, Medal medal) => challenge.TargetFor(medal) - 0.05;
 
-    /// <summary>
-    /// Renders every challenge in turn with no sim attached, so the overlay can be looked at —
-    /// and its longest names checked for wrapping — on a machine that can't run iRacing.
-    /// </summary>
+    /// <summary>Cycles every challenge and medal state with no sim attached, for --demo.</summary>
     private void StartDemo()
     {
-        _demo = true;   // 20 banners in a row, so the medal chime stays off
+        _demo = true;
 
         var challenges = ChallengeCatalog.Embedded.Challenges.OrderBy(c => c.Number).ToList();
         var step = 0;
@@ -152,20 +158,22 @@ public partial class MainWindow : Window
             var index = step / 2 % challenges.Count;
             var challenge = challenges[index];
             var medal = DemoTiers[index % DemoTiers.Length];
+            var lap = medal == Medal.None ? challenge.BronzeSeconds + 1.234 : DemoLap(challenge, medal);
 
-            // Alternate panel and banner, so both states get looked at for every challenge.
             if (step % 2 == 0)
             {
                 HideBanner();
                 Root.Visibility = Visibility.Visible;
+
+                _lastLap = lap;
                 ShowChallenge(challenge, medal);
-                StatusText.Text = medal == Medal.None
-                    ? $"demo   lap  {TimeFormat.Format(challenge.BronzeSeconds + 1.234)}   no medal"
-                    : $"demo   lap  {TimeFormat.Format(DemoLap(challenge, medal))}";
+
+                SessionBestText.Text = TimeFormat.Format(lap - 0.35);
+                EstLapText.Text = TimeFormat.Format(lap + 0.12);
             }
             else if (medal != Medal.None)
             {
-                ShowBanner(medal, DemoLap(challenge, medal), challenge);
+                ShowBanner(medal, lap, challenge);
             }
 
             step++;
@@ -173,24 +181,16 @@ public partial class MainWindow : Window
 
         demo.Start();
 
-        // The unmatched panel is the one state with no challenge, so show it first.
         Root.Visibility = Visibility.Visible;
-        TitleText.Text = "No ARA challenge for this combination";
-        TrackText.Visibility = CarText.Visibility = Visibility.Collapsed;
-        Targets.Visibility = Visibility.Collapsed;
-        StatusText.Text = "track  0  \ncar    0  \ncond   dry";
+        ShowUnmatched("track  0  \ncar    0  \ncond   dry");
     }
 
-    /// <summary>
-    /// The tray icon at the size Windows actually wants — a 16px frame on a standard display,
-    /// a larger one when scaled. The embedded copy is preferred because it can pick that frame;
-    /// the exe's own ApplicationIcon is the backstop, and only then the stock blue "i".
-    /// </summary>
+    /// <summary>Loads the tray icon at the size Windows wants.</summary>
+    /// <returns>The embedded icon, falling back to the exe's own and then the stock blue "i".</returns>
     private static System.Drawing.Icon TrayIcon()
     {
         try
         {
-            // LogicalName in the csproj fixes this string, so it can't drift with RootNamespace.
             using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("AraOverlay.ico");
             if (stream is not null)
                 return new System.Drawing.Icon(stream, Forms.SystemInformation.SmallIconSize);
@@ -201,17 +201,15 @@ public partial class MainWindow : Window
         }
         catch (Exception e) when (e is ArgumentException or IOException)
         {
-            // A malformed .ico shouldn't cost the driver their overlay.
         }
 
         return System.Drawing.SystemIcons.Information;
     }
 
-    // ---- rendering --------------------------------------------------------
-
+    /// <summary>Redraws for the current session: hidden, the challenge panel, or the ids.</summary>
     private void RenderState()
     {
-        _lastLapLine = "";
+        _lastLap = null;
         HideBanner();
 
         if (!_sdk.Connected)
@@ -225,33 +223,91 @@ public partial class MainWindow : Window
         if (_sdk.Challenge is { } challenge)
         {
             ShowChallenge(challenge);
-            StatusText.Text = "";
         }
         else
         {
-            TitleText.Text = "No ARA challenge for this combination";
-            TrackText.Visibility = CarText.Visibility = Visibility.Collapsed;
-            Targets.Visibility = Visibility.Collapsed;
-            // Conditions are shown too: a wet challenge simply won't match in the dry.
-            StatusText.Text = $"track  {_sdk.TrackId}  {_sdk.TrackName}\n" +
-                              $"car    {_sdk.CarId}  {_sdk.CarName}\n" +
-                              $"cond   {(_sdk.IsWet ? "wet" : "dry")}";
+            ShowUnmatched($"track  {_sdk.TrackId}  {_sdk.TrackName}\n" +
+                          $"car    {_sdk.CarId}  {_sdk.CarName}\n" +
+                          $"cond   {(_sdk.IsWet ? "wet" : "dry")}");
         }
     }
 
+    /// <summary>Shows the ids the sim reported, for a track and car matching no challenge.</summary>
+    /// <param name="detail">The lines to print under the title.</param>
+    private void ShowUnmatched(string detail)
+    {
+        TitleText.Text = "NO ARA CHALLENGE FOR THIS COMBINATION";
+        TrackText.Visibility = CarText.Visibility = Visibility.Collapsed;
+        HeaderDivider1.Visibility = HeaderDivider2.Visibility = Visibility.Collapsed;
+        GoalRow.Visibility = DeltaRow.Visibility = Visibility.Collapsed;
+        LapRow.Visibility = Targets.Visibility = Visibility.Collapsed;
+        StatusText.Visibility = Visibility.Visible;
+        StatusText.Text = detail;
+    }
+
+    /// <summary>Fills every row of the panel for a challenge.</summary>
+    /// <param name="challenge">The challenge to show.</param>
+    /// <param name="held">Which medals to treat as held; defaults to the stored progress.</param>
     private void ShowChallenge(Challenge challenge, Medal? held = null)
     {
         TitleText.Text = $"CHALLENGE {challenge.Number}{(challenge.Wet ? "  ·  WET" : "")}";
-        TrackText.Text = challenge.Track;
-        CarText.Text = challenge.Car;
+        TrackText.Text = challenge.Track.ToUpperInvariant();
+        CarText.Text = challenge.Car.ToUpperInvariant();
+
         TrackText.Visibility = CarText.Visibility = Visibility.Visible;
-        Targets.Visibility = Visibility.Visible;
+        HeaderDivider1.Visibility = HeaderDivider2.Visibility = Visibility.Visible;
+        GoalRow.Visibility = DeltaRow.Visibility = Visibility.Visible;
+        LapRow.Visibility = Targets.Visibility = Visibility.Visible;
+        StatusText.Visibility = Visibility.Collapsed;
+
         GoldTime.Text = TimeFormat.Format(challenge.GoldSeconds);
         SilverTime.Text = TimeFormat.Format(challenge.SilverSeconds);
         BronzeTime.Text = TimeFormat.Format(challenge.BronzeSeconds);
+
         UpdateHeldMarks(challenge, held);
+        UpdateGoalAndDelta(challenge, held);
+        UpdateLapRow();
     }
 
+    /// <summary>
+    /// Sets the goal tier and the big delta between the last lap and that tier's target. Once
+    /// gold is held the goal stays gold, so the delta keeps meaning something.
+    /// </summary>
+    /// <param name="challenge">The challenge being shown.</param>
+    /// <param name="held">Which medal to treat as held; defaults to the stored progress.</param>
+    private void UpdateGoalAndDelta(Challenge challenge, Medal? held = null)
+    {
+        var medal = held ?? _progress.Get(challenge.Number)?.BestMedal ?? Medal.None;
+        var goal = Challenge.NextTierAbove(medal) ?? Medal.Gold;
+
+        GoalTier.Text = goal.ToString().ToUpperInvariant();
+        GoalTier.Foreground = (SolidColorBrush)FindResource(goal.ToString());
+        GoalTime.Text = TimeFormat.Format(challenge.TargetFor(goal));
+
+        if (_lastLap is not { } lap)
+        {
+            DeltaText.Text = "—";
+            DeltaText.Foreground = (SolidColorBrush)FindResource("Dim");
+            return;
+        }
+
+        var delta = lap - challenge.TargetFor(goal);
+        var behind = delta > 0;
+
+        DeltaText.Text = delta.ToString("+0.000;-0.000", CultureInfo.InvariantCulture) + (behind ? "s ▼" : "s ▲");
+        DeltaText.Foreground = (SolidColorBrush)FindResource(behind ? "Behind" : "Ahead");
+    }
+
+    /// <summary>Sets the last lap and session best times.</summary>
+    private void UpdateLapRow()
+    {
+        LastLapText.Text = _lastLap is { } lap ? TimeFormat.Format(lap) : "—";
+        SessionBestText.Text = _sdk.SessionBest is { } best ? TimeFormat.Format(best) : "—";
+    }
+
+    /// <summary>Ticks every tier at or below the medal held.</summary>
+    /// <param name="challenge">The challenge whose progress to read.</param>
+    /// <param name="held">Which medal to treat as held; defaults to the stored progress.</param>
     private void UpdateHeldMarks(Challenge challenge, Medal? held = null)
     {
         var medal = held ?? _progress.Get(challenge.Number)?.BestMedal ?? Medal.None;
@@ -261,51 +317,63 @@ public partial class MainWindow : Window
         BronzeMark.Text = medal >= Medal.Bronze ? "✓" : "";
     }
 
-    private void OnTick(double currentLapSeconds, bool clean, string reason)
+    /// <summary>
+    /// Updates the estimated lap, which doubles as the warning line: a spoiled lap shows what
+    /// spoiled it instead of a projection it can no longer earn. Called per frame, so it only
+    /// writes on change.
+    /// </summary>
+    /// <param name="live">The lap in progress.</param>
+    private void OnTick(LiveLap live)
     {
-        if (_sdk.Challenge is null) return;   // the unmatched panel shows ids, not lap times
+        if (_sdk.Challenge is null) return;
 
-        var live = currentLapSeconds > 0 ? $"lap  {TimeFormat.Format(currentLapSeconds)}" : "lap  —";
-        if (!clean) live += $"   ! {reason}";
+        var text = live.Clean
+            ? live.EstimatedSeconds is { } estimate ? TimeFormat.Format(estimate) : "—"
+            : $"! {live.Reason}";
 
-        var text = _lastLapLine.Length == 0 ? live : live + "\n" + _lastLapLine;
-        if (StatusText.Text != text) StatusText.Text = text;   // 60Hz, so only touch it on change
+        if (EstLapText.Text != text)
+        {
+            EstLapText.Text = text;
+            EstLapText.Foreground = (SolidColorBrush)FindResource(live.Clean ? "Ink" : "Behind");
+        }
     }
 
+    /// <summary>Records a finished lap and pops the banner if it earned a new tier.</summary>
+    /// <param name="lap">The completed or invalidated lap.</param>
     private void OnLapFinished(LapEvent lap)
     {
         if (_sdk.Challenge is not { } challenge) return;
 
         if (lap.Outcome == LapOutcome.Invalidated)
         {
-            _lastLapLine = $"last {TimeFormat.Format(lap.Seconds)}  INVALID ({lap.Reason})";
+            LastLapText.Text = $"{TimeFormat.Format(lap.Seconds)}  INVALID";
             return;
         }
 
+        _lastLap = lap.Seconds;
+
         var medal = challenge.MedalFor(lap.Seconds);
         var earnedNewTier = _progress.RecordLap(challenge.Number, lap.Seconds, medal);
+
         UpdateHeldMarks(challenge);
-
-        var held = _progress.Get(challenge.Number)?.BestMedal ?? Medal.None;
-        var chasing = Challenge.NextTierAbove(held);
-
-        _lastLapLine = chasing is { } next
-            ? $"last {TimeFormat.Format(lap.Seconds)}  {next.ToString().ToLowerInvariant()} " +
-              $"{(lap.Seconds - challenge.TargetFor(next)).ToString("+0.000;-0.000", CultureInfo.InvariantCulture)}"
-            : $"last {TimeFormat.Format(lap.Seconds)}  gold held";
+        UpdateGoalAndDelta(challenge);
+        UpdateLapRow();
 
         if (earnedNewTier) ShowBanner(medal, lap.Seconds, challenge);
     }
 
+    /// <summary>Tears down the tray icon and the SDK, then exits. The only shutdown path.</summary>
     private void Quit()
     {
-        // ShutdownMode is OnExplicitShutdown, so closing the window doesn't end the app and this
-        // is the only teardown path. Miss it and the tray icon lingers as a ghost.
         if (_tray is not null) { _tray.Visible = false; _tray.Dispose(); _tray = null; }
         _sdk.Dispose();
         Application.Current.Shutdown();
     }
 
+    /// <summary>Shows the medal banner in place of the panel, for eight seconds.</summary>
+    /// <param name="medal">The medal earned; None shows nothing.</param>
+    /// <param name="seconds">The lap time that earned it.</param>
+    /// <param name="challenge">The challenge it was set on.</param>
     private void ShowBanner(Medal medal, double seconds, Challenge challenge)
     {
         if (medal == Medal.None) return;
@@ -319,13 +387,14 @@ public partial class MainWindow : Window
         BannerSub.Text = $"Challenge {challenge.Number} — {challenge.Track}";
 
         Banner.Visibility = Visibility.Visible;
-        Panel.Visibility = Visibility.Collapsed;   // swap rather than stack, so nothing jumps
+        Panel.Visibility = Visibility.Collapsed;
 
         _bannerTimer.Stop();
         _bannerTimer.Start();
         if (!_demo) SystemSounds.Asterisk.Play();
     }
 
+    /// <summary>Puts the panel back. Safe when no banner is showing.</summary>
     private void HideBanner()
     {
         _bannerTimer.Stop();

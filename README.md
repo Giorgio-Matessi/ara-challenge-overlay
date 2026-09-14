@@ -23,17 +23,24 @@ stack on screen and fight over the progress file.
 Run `AraChallengeOverlay.exe` and leave it running — it lives in the system tray and stays
 invisible until iRacing is up.
 
-- On a challenge's track+car: the three target times, a ✓ on every medal you already hold, your
-  live lap time and how far the last lap sat from the next tier up.
-- On anything else: the track and car ids the sim reported plus the detected conditions, so you
-  can check them against `challenges.json`.
+On a challenge's track and car, the panel reads top to bottom:
+
+| Row | |
+|---|---|
+| **Challenge / track / car** | Which challenge you've loaded. Wet challenges are marked. |
+| **Goal / est. lap** | The tier you're chasing next and its target, against a live projection of the lap you're on. Once the lap is spoiled this cell says what spoiled it instead. |
+| **The big number** | How far your last lap sat from the goal. Red and `▼` means there's still time to find; green and `▲` means you cleared it. |
+| **Last lap / session best** | Your last completed lap, and the quickest clean one this session. |
+| **Gold / silver / bronze** | All three targets, with a ✓ on every medal you already hold. |
+
+On anything else it shows the track and car ids the sim reported plus the detected conditions,
+so you can check them against `challenges.json`.
 
 Right-click the tray icon for:
 
 | | |
 |---|---|
 | **Lock position (click-through)** | On by default. Unlock to drag the overlay somewhere else; lock again so the mouse passes through to the sim. |
-| **Copy current track/car ID** | Puts the sim's real ids on the clipboard, ready to paste into `challenges.json`. |
 | **Exit** | |
 
 A lap is only worth a medal if it's **clean**. Leaving the track surface, picking up incident
@@ -41,6 +48,8 @@ points, or touching pit lane invalidates the lap, and the overlay says which one
 
 Your best time and best medal per challenge live in
 `%APPDATA%\AraOverlay\progress.json`; window position and lock state in `settings.json` beside it.
+If the overlay ever stops responding to the sim, `errors.log` in the same folder records what the
+iRacing SDK threw — send it along with the report.
 The banner only fires when you *improve* a tier, so a second gold lap won't interrupt you again.
 
 ## The challenge list

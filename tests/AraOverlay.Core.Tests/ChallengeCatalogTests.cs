@@ -2,6 +2,7 @@ using AraOverlay.Core;
 
 namespace AraOverlay.Core.Tests;
 
+/// <summary>Covers loading challenges.json, matching a session, and the guards on a bad row.</summary>
 public class ChallengeCatalogTests
 {
     private const string TwoRows = """
@@ -22,10 +23,10 @@ public class ChallengeCatalogTests
     }
 
     [Theory]
-    [InlineData(299, 67)]    // right track, wrong car
-    [InlineData(181, 142)]   // right car, wrong track
+    [InlineData(299, 67)]
+    [InlineData(181, 142)]
     [InlineData(500, 142)]
-    [InlineData(0, 0)]       // the SDK's "nothing loaded yet"
+    [InlineData(0, 0)]
     [InlineData(-1, -1)]
     public void Find_ReturnsNullWhenNothingMatches(int track, int car)
     {

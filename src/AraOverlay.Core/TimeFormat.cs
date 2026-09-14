@@ -2,13 +2,12 @@ using System.Globalization;
 
 namespace AraOverlay.Core;
 
-/// <summary>
-/// Lap times are authored in challenges.json as human strings ("1:23.456") so the
-/// file stays hand-editable, and rendered back the same way for the overlay.
-/// </summary>
+/// <summary>Converts lap times between seconds and the "M:SS.fff" strings used in challenges.json.</summary>
 public static class TimeFormat
 {
-    /// <summary>Parses "M:SS.fff" or plain seconds into seconds. Throws on anything else.</summary>
+    /// <summary>Parses a lap time.</summary>
+    /// <param name="text">"M:SS.fff", or plain seconds.</param>
+    /// <returns>The time in seconds.</returns>
     public static double Parse(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
@@ -34,10 +33,11 @@ public static class TimeFormat
         return minutes * 60 + seconds;
     }
 
-    /// <summary>Renders seconds as "M:SS.fff".</summary>
+    /// <summary>Renders a lap time.</summary>
+    /// <param name="seconds">The time in seconds.</param>
+    /// <returns>The time as "M:SS.fff".</returns>
     public static string Format(double seconds)
     {
-        // Round to milliseconds first, so 119.9996 becomes 2:00.000 rather than 1:60.000.
         var total = Math.Round(seconds, 3, MidpointRounding.AwayFromZero);
         var minutes = (int)(total / 60);
         var rest = total - minutes * 60;

@@ -2,6 +2,7 @@ using AraOverlay.Core;
 
 namespace AraOverlay.Core.Tests;
 
+/// <summary>Covers stored progress and when a lap counts as an improvement.</summary>
 public class ProgressStoreTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "ara-tests-" + Guid.NewGuid().ToString("N"));
@@ -76,7 +77,7 @@ public class ProgressStoreTests : IDisposable
         var reloaded = new ProgressStore(Path_);
         Assert.Equal(Medal.Silver, reloaded.Get(7)!.BestMedal);
         Assert.Equal(54.1, reloaded.Get(7)!.BestSeconds, 3);
-        Assert.False(reloaded.RecordLap(7, 54.0, Medal.Silver));   // still no repeat popup
+        Assert.False(reloaded.RecordLap(7, 54.0, Medal.Silver));
     }
 
     [Fact]
@@ -94,6 +95,6 @@ public class ProgressStoreTests : IDisposable
 
         var store = new ProgressStore(Path_);
         Assert.Null(store.Get(1));
-        Assert.True(store.RecordLap(1, 54.9, Medal.Bronze));       // and it recovers on the next write
+        Assert.True(store.RecordLap(1, 54.9, Medal.Bronze));
     }
 }

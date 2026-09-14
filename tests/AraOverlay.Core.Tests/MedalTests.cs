@@ -2,6 +2,7 @@ using AraOverlay.Core;
 
 namespace AraOverlay.Core.Tests;
 
+/// <summary>Covers grading a lap against the three targets, including each boundary.</summary>
 public class MedalTests
 {
     private static readonly Challenge Sample = new()
@@ -48,7 +49,7 @@ public class MedalTests
     }
 
     [Theory]
-    [InlineData(-1.0)]   // the SDK's "no lap yet" sentinel
+    [InlineData(-1.0)]
     [InlineData(0.0)]
     public void MedalFor_RejectsNonLaps(double lap)
     {
