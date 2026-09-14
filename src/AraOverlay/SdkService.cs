@@ -8,9 +8,11 @@ namespace AraOverlay;
 
 /// <summary>
 /// The only place that touches the iRacing SDK. Translates its callbacks into plain events and
-/// feeds <see cref="LapTracker"/>; everything above this line is testable Core code.
+/// feeds the trackers; events fire on the SDK's thread, so callers marshal to the UI themselves.
 ///
-/// Events fire on the SDK's own thread — callers marshal to the UI thread themselves.
+/// Each IRSDKSharper loop is written try { while (alive) } catch, so one exception ends it for
+/// the life of the process and the overlay never reconnects. Hence the restart below, and the
+/// catch-all in the handlers, which run inside that same try.
 /// </summary>
 public sealed class SdkService : IDisposable
 {
@@ -19,33 +21,24 @@ public sealed class SdkService : IDisposable
     private readonly ConditionTracker _conditions = new();
     private readonly ChallengeCatalog _catalog = ChallengeCatalog.Embedded;
 
-    /// <summary>Long enough that a fault which repeats immediately can't spin the restart.</summary>
     private static readonly TimeSpan RestartDelay = TimeSpan.FromSeconds(2);
 
     private string _lastLogged = "";
     private int _restarting;
 
-    /// <summary>True while iRacing is running and handing us telemetry.</summary>
     public bool Connected { get; private set; }
-
-    /// <summary>iRacing's numeric ids for the current session — what a challenge matches on.</summary>
     public int TrackId { get; private set; }
     public int CarId { get; private set; }
-
-    /// <summary>The same track and car by name, so the unmatched panel is readable.</summary>
     public string TrackName { get; private set; } = "";
     public string CarName { get; private set; } = "";
-
-    /// <summary>True when the session counts as wet — challenges 16-20 need this to match.</summary>
     public bool IsWet => _conditions.IsWet;
-
-    /// <summary>The challenge for this track, car and conditions, or null if there isn't one.</summary>
     public Challenge? Challenge { get; private set; }
 
     public event Action? StateChanged;
-    public event Action<double, bool, string>? Tick;   // current lap seconds, clean, reason
+    public event Action<double, bool, string>? Tick;
     public event Action<LapEvent>? LapFinished;
 
+    /// <summary>Subscribes to the SDK and starts its background loops.</summary>
     public void Start()
     {
         _sdk.OnException += HandleException;
@@ -56,33 +49,28 @@ public sealed class SdkService : IDisposable
         _sdk.Start();
     }
 
+    /// <summary>Stops the SDK, on exit.</summary>
     public void Dispose()
     {
-        try { _sdk.Stop(); } catch { /* shutting down anyway */ }
+        try { _sdk.Stop(); } catch { }
     }
 
-    /// <summary>
-    /// Each IRSDKSharper loop is shaped <c>try { while (alive) { ... } } catch</c>, so one exception
-    /// ends that loop for the life of the process. The telemetry loop is the only thing that raises
-    /// OnConnected, so if it dies the overlay never reappears until the app is restarted — which is
-    /// exactly what a driver sees after a few session changes. Restart the SDK instead.
-    /// </summary>
+    /// <summary>Logs a dead SDK loop and restarts the SDK, since nothing else will.</summary>
+    /// <param name="e">What the loop threw.</param>
     private void HandleException(Exception e)
     {
         Log(e);
 
-        // Only one restart at a time: a single fault can kill more than one loop.
         if (Interlocked.Exchange(ref _restarting, 1) == 1) return;
 
-        // Never from this thread. Stop() joins the loop thread that is calling us, and Start()
-        // waits for Stop() to finish, so doing it here deadlocks both.
+        // Never from this thread: Stop() joins it and Start() waits for Stop(), which deadlocks.
         Task.Run(async () =>
         {
             await Task.Delay(RestartDelay);
             try
             {
                 _sdk.Stop();
-                _sdk.Start();   // handlers survive Stop(), so this must not go through our Start()
+                _sdk.Start();
             }
             catch (Exception restartFailure)
             {
@@ -92,10 +80,8 @@ public sealed class SdkService : IDisposable
         });
     }
 
-    /// <summary>
-    /// Appends to %APPDATA%\AraOverlay\errors.log. Repeats are dropped, because a fault that
-    /// recurs every telemetry frame would otherwise write sixty lines a second.
-    /// </summary>
+    /// <summary>Appends to %APPDATA%\AraOverlay\errors.log, dropping repeats.</summary>
+    /// <param name="e">The exception to record.</param>
     private void Log(Exception e)
     {
         var summary = $"{e.GetType().Name}: {e.Message}";
@@ -111,10 +97,10 @@ public sealed class SdkService : IDisposable
         }
         catch (Exception logFailure) when (logFailure is IOException or UnauthorizedAccessException)
         {
-            // A log we can't write is not worth taking the overlay down for.
         }
     }
 
+    /// <summary>iRacing started producing data.</summary>
     private void HandleConnected()
     {
         Connected = true;
@@ -122,6 +108,7 @@ public sealed class SdkService : IDisposable
         StateChanged?.Invoke();
     }
 
+    /// <summary>iRacing stopped producing data.</summary>
     private void HandleDisconnected()
     {
         Connected = false;
@@ -133,10 +120,10 @@ public sealed class SdkService : IDisposable
         StateChanged?.Invoke();
     }
 
-    // Both handlers below are called from inside IRSDKSharper's loops, within the try that keeps
-    // each loop alive. Anything that escapes one of them ends that loop for good, so they swallow
-    // and log rather than throw.
-
+    /// <summary>
+    /// Reads the track and car from session info and re-matches if either changed. A failed read
+    /// leaves the previous match alone, since the SDK schedules its own retry.
+    /// </summary>
     private void HandleSessionInfo()
     {
         try
@@ -147,7 +134,6 @@ public sealed class SdkService : IDisposable
             var track = info.WeekendInfo.TrackID;
             var car = me?.CarID ?? 0;
 
-            // Names are only for the unmatched panel, so they follow whatever the ids say.
             TrackName = info.WeekendInfo.TrackName ?? "";
             CarName = me?.CarPath ?? "";
 
@@ -160,22 +146,21 @@ public sealed class SdkService : IDisposable
         }
         catch (Exception e)
         {
-            // A read that fails leaves the previous match alone — IRSDKSharper schedules a retry,
-            // and clearing the panel for one bad read would only flicker.
             Log(e);
         }
     }
 
-    /// <summary>
-    /// Re-runs the lookup. Called on a session change and whenever the track flips between wet
-    /// and dry, since conditions are part of what identifies a challenge.
-    /// </summary>
+    /// <summary>Re-runs the lookup, for a session change or a flip between wet and dry.</summary>
     private void Rematch()
     {
         Challenge = _catalog.Find(TrackId, CarId, _conditions.IsWet);
         StateChanged?.Invoke();
     }
 
+    /// <summary>
+    /// Feeds one frame to the trackers, raising Tick every frame and LapFinished when a lap
+    /// resolves. A frame that can't be read is skipped: telemetry can be mid-swap between sessions.
+    /// </summary>
     private void HandleTelemetryData()
     {
         try
@@ -199,7 +184,6 @@ public sealed class SdkService : IDisposable
         }
         catch (Exception e)
         {
-            // Telemetry can be mid-swap between sessions; skip the frame rather than die.
             Log(e);
         }
     }

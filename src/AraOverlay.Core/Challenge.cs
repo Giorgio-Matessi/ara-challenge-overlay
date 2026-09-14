@@ -2,7 +2,6 @@ using System.Text.Json.Serialization;
 
 namespace AraOverlay.Core;
 
-/// <summary>Ordered so that a higher tier compares greater, and so that +1 is the tier above.</summary>
 public enum Medal
 {
     None = 0,
@@ -12,39 +11,17 @@ public enum Medal
 }
 
 /// <summary>
-/// One ARA challenge: a fixed track + car + conditions, with three lap-time targets.
-/// Times are authored as strings ("1:23.456") so challenges.json stays hand-editable.
+/// One ARA challenge: a fixed track, car and condition with three lap-time targets.
 /// </summary>
 public sealed class Challenge
 {
-    /// <summary>
-    /// The league rule is "quicker than the listed time", but iRacing hands us a float and the
-    /// sim shows three decimals: a lap of 53.5004 displays as "53.500" and would look like a
-    /// pass. So a lap counts if it is at most half a millisecond over. Set this to 0 to make
-    /// the comparison strictly faster-than.
-    /// </summary>
     private const double DisplayTolerance = 0.0005;
 
     public int Number { get; init; }
-
-    /// <summary>Track and car as the league lists them — shown on their own overlay lines.</summary>
     public string Track { get; init; } = "";
     public string Car { get; init; } = "";
-
-    /// <summary>
-    /// iRacing's WeekendInfo:TrackID — the layout, not the track package. Usually one, but a
-    /// challenge can be run on more than one build of the same circuit: #11 and #18 accept
-    /// either Spa layout.
-    /// </summary>
     public int[] TrackIds { get; init; } = [];
-
-    /// <summary>iRacing's DriverInfo:Drivers:CarID.</summary>
     public int CarId { get; init; }
-
-    /// <summary>
-    /// True for the wet-weather challenges. Track and car alone don't identify a challenge:
-    /// #14 and #19 are the same car on the same Le Mans layout, dry and wet.
-    /// </summary>
     public bool Wet { get; init; }
 
     public string Gold { get; init; } = "";
@@ -55,14 +32,15 @@ public sealed class Challenge
     [JsonIgnore] public double SilverSeconds => TimeFormat.Parse(Silver);
     [JsonIgnore] public double BronzeSeconds => TimeFormat.Parse(Bronze);
 
-    /// <summary>Tiers fastest first, which is also the order a lap is tested against them.</summary>
     private (Medal Medal, double Seconds)[] Tiers =>
         [(Medal.Gold, GoldSeconds), (Medal.Silver, SilverSeconds), (Medal.Bronze, BronzeSeconds)];
 
-    /// <summary>The best medal this lap time earns, or <see cref="Medal.None"/>.</summary>
+    /// <summary>Grades a lap against the three targets.</summary>
+    /// <param name="lapSeconds">The lap time; the SDK reports -1 when there isn't one.</param>
+    /// <returns>The best medal the lap earns, or None.</returns>
     public Medal MedalFor(double lapSeconds)
     {
-        if (lapSeconds <= 0) return Medal.None;   // -1 is the SDK's "no lap yet"
+        if (lapSeconds <= 0) return Medal.None;
 
         foreach (var (medal, seconds) in Tiers)
             if (lapSeconds <= seconds + DisplayTolerance) return medal;
@@ -70,7 +48,9 @@ public sealed class Challenge
         return Medal.None;
     }
 
-    /// <summary>Threshold in seconds for a tier. <see cref="Medal.None"/> has no threshold.</summary>
+    /// <summary>Looks up one tier's target.</summary>
+    /// <param name="medal">Gold, Silver or Bronze.</param>
+    /// <returns>The threshold in seconds.</returns>
     public double TargetFor(Medal medal) => medal switch
     {
         Medal.Gold => GoldSeconds,
@@ -79,10 +59,13 @@ public sealed class Challenge
         _ => throw new ArgumentOutOfRangeException(nameof(medal), medal, "No threshold for this tier."),
     };
 
-    /// <summary>The tier a driver is chasing next, or null once they hold gold.</summary>
+    /// <summary>Works out what a driver is aiming at next.</summary>
+    /// <param name="held">The best medal they hold.</param>
+    /// <returns>The tier above it, or null once they hold gold.</returns>
     public static Medal? NextTierAbove(Medal held) => held == Medal.Gold ? null : held + 1;
 
-    /// <summary>Throws on a row that can't work — catches a typo at load time, not mid-session.</summary>
+    /// <summary>Checks one row is usable, so a typo fails at load rather than mid-session.</summary>
+    /// <exception cref="InvalidDataException">No track ids, or times out of order.</exception>
     public void Validate()
     {
         if (TrackIds.Length == 0)

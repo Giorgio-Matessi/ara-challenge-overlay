@@ -2,6 +2,7 @@ using AraOverlay.Core;
 
 namespace AraOverlay.Core.Tests;
 
+/// <summary>Covers the wet/dry decision and its two thresholds.</summary>
 public class ConditionTrackerTests
 {
     [Fact]
@@ -13,7 +14,7 @@ public class ConditionTrackerTests
     [Theory]
     [InlineData(TrackWetness.Dry)]
     [InlineData(TrackWetness.MostlyDry)]
-    [InlineData(TrackWetness.VeryLightlyWet)]   // below the threshold to declare a wet session
+    [InlineData(TrackWetness.VeryLightlyWet)]
     public void StaysDryUntilItIsProperlyWet(int wetness)
     {
         var conditions = new ConditionTracker();
