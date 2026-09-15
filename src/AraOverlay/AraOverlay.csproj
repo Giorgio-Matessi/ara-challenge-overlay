@@ -23,6 +23,9 @@
     <!-- ApplicationIcon covers Explorer and the taskbar; the tray needs it as a stream too.
          LogicalName pins the resource name, which otherwise depends on RootNamespace. -->
     <EmbeddedResource Include="AraOverlay.ico" LogicalName="AraOverlay.ico" />
+
+    <!-- Baked in, so the single-file exe still has it. Link fixes the pack URI the XAML uses. -->
+    <Resource Include="..\..\assets\waiting-banner.png" Link="assets\waiting-banner.png" />
   </ItemGroup>
 
   <ItemGroup>

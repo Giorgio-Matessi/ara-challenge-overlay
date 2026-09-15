@@ -79,7 +79,7 @@ public partial class MainWindow : Window
 
         SetWindowLong(_hwnd, GWL_EXSTYLE, style);
 
-        Panel.BorderBrush = _settings.Locked
+        Panel.BorderBrush = Waiting.BorderBrush = _settings.Locked
             ? new SolidColorBrush(Color.FromArgb(0x20, 0xFF, 0xFF, 0xFF))
             : new SolidColorBrush(Color.FromArgb(0xFF, 0x4C, 0xC2, 0xFF));
     }
@@ -150,11 +150,21 @@ public partial class MainWindow : Window
         _demo = true;
 
         var challenges = ChallengeCatalog.Embedded.Challenges.OrderBy(c => c.Number).ToList();
-        var step = 0;
+
+        // Opens on the waiting art, then an unmatched session, then the challenge cycle.
+        var step = -1;
 
         var demo = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
         demo.Tick += (_, _) =>
         {
+            if (step < 0)
+            {
+                step++;
+                HideBanner();
+                ShowUnmatched("track  0  \ncar    0  \ncond   dry");
+                return;
+            }
+
             var index = step / 2 % challenges.Count;
             var challenge = challenges[index];
             var medal = DemoTiers[index % DemoTiers.Length];
@@ -163,7 +173,6 @@ public partial class MainWindow : Window
             if (step % 2 == 0)
             {
                 HideBanner();
-                Root.Visibility = Visibility.Visible;
 
                 _lastLap = lap;
                 ShowChallenge(challenge, medal);
@@ -181,8 +190,7 @@ public partial class MainWindow : Window
 
         demo.Start();
 
-        Root.Visibility = Visibility.Visible;
-        ShowUnmatched("track  0  \ncar    0  \ncond   dry");
+        ShowLayer(Layer.Waiting);
     }
 
     /// <summary>Loads the tray icon at the size Windows wants.</summary>
@@ -212,13 +220,7 @@ public partial class MainWindow : Window
         _lastLap = null;
         HideBanner();
 
-        if (!_sdk.Connected)
-        {
-            Root.Visibility = Visibility.Collapsed;
-            return;
-        }
-
-        Root.Visibility = Visibility.Visible;
+        if (!_sdk.Connected) return;
 
         if (_sdk.Challenge is { } challenge)
         {
@@ -367,6 +369,20 @@ public partial class MainWindow : Window
         Application.Current.Shutdown();
     }
 
+    private enum Layer { Waiting, Panel, Medal }
+
+    /// <summary>Shows one layer and hides the other two.</summary>
+    /// <param name="layer">The layer to show.</param>
+    private void ShowLayer(Layer layer)
+    {
+        Waiting.Visibility = layer == Layer.Waiting ? Visibility.Visible : Visibility.Collapsed;
+        Panel.Visibility = layer == Layer.Panel ? Visibility.Visible : Visibility.Collapsed;
+        Banner.Visibility = layer == Layer.Medal ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>What shows when no medal banner is up: the panel, or the waiting art.</summary>
+    private Layer RestingLayer => _demo || _sdk.Connected ? Layer.Panel : Layer.Waiting;
+
     /// <summary>Shows the medal banner in place of the panel, for eight seconds.</summary>
     /// <param name="medal">The medal earned; None shows nothing.</param>
     /// <param name="seconds">The lap time that earned it.</param>
@@ -383,19 +399,17 @@ public partial class MainWindow : Window
         BannerTime.Text = TimeFormat.Format(seconds);
         BannerSub.Text = $"Challenge {challenge.Number} — {challenge.Track}";
 
-        Banner.Visibility = Visibility.Visible;
-        Panel.Visibility = Visibility.Collapsed;
+        ShowLayer(Layer.Medal);
 
         _bannerTimer.Stop();
         _bannerTimer.Start();
         if (!_demo) SystemSounds.Asterisk.Play();
     }
 
-    /// <summary>Puts the panel back. Safe when no banner is showing.</summary>
+    /// <summary>Drops back to the resting layer. Safe when no banner is showing.</summary>
     private void HideBanner()
     {
         _bannerTimer.Stop();
-        Banner.Visibility = Visibility.Collapsed;
-        Panel.Visibility = Visibility.Visible;
+        ShowLayer(RestingLayer);
     }
 }
