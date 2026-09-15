@@ -79,7 +79,7 @@ public partial class MainWindow : Window
 
         SetWindowLong(_hwnd, GWL_EXSTYLE, style);
 
-        Panel.BorderBrush = Waiting.BorderBrush = _settings.Locked
+        Panel.BorderBrush = _settings.Locked
             ? new SolidColorBrush(Color.FromArgb(0x20, 0xFF, 0xFF, 0xFF))
             : new SolidColorBrush(Color.FromArgb(0xFF, 0x4C, 0xC2, 0xFF));
     }
