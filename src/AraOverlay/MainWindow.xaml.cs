@@ -400,10 +400,14 @@ public partial class MainWindow : Window
         BannerSub.Text = $"Challenge {challenge.Number} — {challenge.Track}";
 
         ShowLayer(Layer.Medal);
+
+        // Burst() decides whether to join the render loop before it spawns, so a burst on an
+        // empty control never animates. StopRain re-runs that decision; no rain is ever started.
         Confetti.Burst(colors: [
             (SolidColorBrush)FindResource(medal.ToString()),
             (SolidColorBrush)FindResource("Ink"),
         ]);
+        Confetti.StopRain();
 
         _bannerTimer.Stop();
         _bannerTimer.Start();
