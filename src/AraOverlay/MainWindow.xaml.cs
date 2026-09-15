@@ -27,8 +27,17 @@ public partial class MainWindow : Window
     private const int WS_EX_TRANSPARENT = 0x00000020;
     private const int WS_EX_NOACTIVATE = 0x08000000;
 
+    private const int WM_HOTKEY = 0x0312;
+    private const int MOD_ALT = 0x0001;
+    private const int MOD_CONTROL = 0x0002;
+    private const int MOD_NOREPEAT = 0x4000;
+    private const int VK_L = 0x4C;
+    private const int LockHotkeyId = 1;
+
     [DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr hWnd, int index);
     [DllImport("user32.dll")] private static extern int SetWindowLong(IntPtr hWnd, int index, int value);
+    [DllImport("user32.dll")] private static extern bool RegisterHotKey(IntPtr hWnd, int id, int modifiers, int vk);
+    [DllImport("user32.dll")] private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
     private readonly Settings _settings = Settings.Load();
     private readonly ProgressStore _progress = new(JsonFile.PathIn("progress.json"));
@@ -38,6 +47,7 @@ public partial class MainWindow : Window
     private Forms.NotifyIcon? _tray;
     private Forms.ToolStripMenuItem? _lockItem;
     private IntPtr _hwnd;
+    private bool _hotkeyClaimed;
     private double? _lastLap;
     private bool _demo;
 
@@ -63,6 +73,7 @@ public partial class MainWindow : Window
         base.OnSourceInitialized(e);
         _hwnd = new WindowInteropHelper(this).Handle;
         ApplyWindowStyles();
+        ClaimLockHotkey();
         BuildTrayIcon();
 
         if (Environment.GetCommandLineArgs().Contains("--demo")) StartDemo();
@@ -82,6 +93,32 @@ public partial class MainWindow : Window
         Panel.BorderBrush = _settings.Locked
             ? new SolidColorBrush(Color.FromArgb(0x20, 0xFF, 0xFF, 0xFF))
             : new SolidColorBrush(Color.FromArgb(0xFF, 0x4C, 0xC2, 0xFF));
+    }
+
+    /// <summary>
+    /// Registers Ctrl+Alt+L system-wide, since the overlay never holds keyboard focus and never
+    /// sees an input binding. Failure means another program already owns it; the tray still works.
+    /// </summary>
+    private void ClaimLockHotkey()
+    {
+        _hotkeyClaimed = RegisterHotKey(_hwnd, LockHotkeyId, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_L);
+        if (_hotkeyClaimed) HwndSource.FromHwnd(_hwnd)?.AddHook(OnWindowMessage);
+    }
+
+    /// <summary>Catches the lock hotkey.</summary>
+    /// <param name="hwnd">Unused.</param>
+    /// <param name="message">The window message.</param>
+    /// <param name="wParam">The hotkey id, for WM_HOTKEY.</param>
+    /// <param name="lParam">Unused.</param>
+    /// <param name="handled">Set when the message was the lock hotkey.</param>
+    /// <returns>Zero; the message is handled through the flag.</returns>
+    private IntPtr OnWindowMessage(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (message != WM_HOTKEY || wParam.ToInt32() != LockHotkeyId) return IntPtr.Zero;
+
+        ToggleLock();
+        handled = true;
+        return IntPtr.Zero;
     }
 
     /// <summary>Drags the overlay while unlocked, saving where it lands.</summary>
@@ -120,6 +157,7 @@ public partial class MainWindow : Window
         _lockItem = new Forms.ToolStripMenuItem("Lock position (click-through)", null, (_, _) => ToggleLock())
         {
             Checked = _settings.Locked,
+            ShortcutKeyDisplayString = _hotkeyClaimed ? "Ctrl+Alt+L" : "",
         };
 
         var menu = new Forms.ContextMenuStrip();
@@ -364,6 +402,7 @@ public partial class MainWindow : Window
     /// <summary>Tears down the tray icon and the SDK, then exits. The only shutdown path.</summary>
     private void Quit()
     {
+        if (_hotkeyClaimed) UnregisterHotKey(_hwnd, LockHotkeyId);
         if (_tray is not null) { _tray.Visible = false; _tray.Dispose(); _tray = null; }
         _sdk.Dispose();
         Application.Current.Shutdown();
