@@ -376,8 +376,7 @@ public partial class MainWindow : Window
     private void ShowLayer(Layer layer)
     {
         Waiting.Visibility = layer == Layer.Waiting ? Visibility.Visible : Visibility.Collapsed;
-        // Hidden, not Collapsed: the panel keeps its layout slot and so sizes every other layer.
-        Panel.Visibility = layer == Layer.Panel ? Visibility.Visible : Visibility.Hidden;
+        Panel.Visibility = layer == Layer.Panel ? Visibility.Visible : Visibility.Collapsed;
         Banner.Visibility = layer == Layer.Medal ? Visibility.Visible : Visibility.Collapsed;
     }
 

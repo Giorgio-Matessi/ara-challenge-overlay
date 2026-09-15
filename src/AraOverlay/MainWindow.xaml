@@ -48,25 +48,21 @@
 
     <Grid x:Name="Root">
 
-        <!-- Shown until iRacing is running. Sized off the panel, which keeps its layout slot
-             while hidden, so the overlay is the same box whichever layer is up. MinWidth is the
-             panel's own minimum, covering the first layout pass before ActualWidth is real. -->
+        <!-- Shown until iRacing is running. The image is 1000x600, so it needs an explicit
+             width or it sizes the whole window: 340 is the panel's own content width. -->
         <Border x:Name="Waiting"
-                Width="{Binding ActualWidth, ElementName=Panel}"
-                Height="{Binding ActualHeight, ElementName=Panel}"
-                MinWidth="368"
                 Background="#D910181C"
                 CornerRadius="10"
                 Padding="14,9"
                 BorderThickness="1"
                 BorderBrush="#20FFFFFF"
                 MouseLeftButtonDown="OnPanelDrag">
-            <Image Source="/assets/waiting-banner.png" Stretch="Uniform"/>
+            <Image Source="/assets/waiting-banner.png" Width="340"/>
         </Border>
 
         <!-- Standing panel -->
         <Border x:Name="Panel"
-                Visibility="Hidden"
+                Visibility="Collapsed"
                 Background="#D910181C"
                 CornerRadius="10"
                 Padding="14,9"
@@ -197,7 +193,7 @@
                 CornerRadius="10"
                 Padding="22,16"
                 BorderThickness="2">
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+            <StackPanel HorizontalAlignment="Center">
                 <TextBlock x:Name="BannerTitle"
                            FontFamily="Segoe UI Black" FontSize="30"
                            HorizontalAlignment="Center"/>
