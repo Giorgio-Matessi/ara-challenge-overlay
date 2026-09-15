@@ -105,4 +105,6 @@ that touches iRacing.
 
 ## Licence
 
-GPL-3.0, inherited from [IRSDKSharper](https://github.com/mherbold/IRSDKSharper).
+GPL-3.0, inherited from [IRSDKSharper](https://github.com/mherbold/IRSDKSharper). The medal
+banner's confetti is [Wpf.Confetti](https://github.com/caefale/WpfConfetti), MIT, which GPL-3.0
+permits combining with.

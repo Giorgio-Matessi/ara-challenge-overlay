@@ -1,6 +1,7 @@
 <Window x:Class="AraOverlay.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:confetti="clr-namespace:Wpf.Confetti;assembly=Wpf.Confetti"
         Title="ARA Challenge Overlay"
         WindowStyle="None"
         AllowsTransparency="True"
@@ -218,5 +219,9 @@
                 </StackPanel>
             </Grid>
         </Border>
+
+        <!-- Last child, so it draws over the banner. The control sets IsHitTestVisible false
+             itself, so it does not interfere with dragging the panel. -->
+        <confetti:ConfettiControl x:Name="Confetti" Visibility="Hidden"/>
     </Grid>
 </Window>

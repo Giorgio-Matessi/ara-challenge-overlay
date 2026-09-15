@@ -371,10 +371,12 @@ public partial class MainWindow : Window
 
     private enum Layer { Waiting, Panel, Medal }
 
-    /// <summary>Shows one layer and hides the other two.</summary>
+    /// <summary>Shows one layer and hides the other two. Confetti rides with the medal banner.</summary>
     /// <param name="layer">The layer to show.</param>
     private void ShowLayer(Layer layer)
     {
+        // Hidden, not Collapsed: it stays laid out, so a burst still knows where its centre is.
+        Confetti.Visibility = layer == Layer.Medal ? Visibility.Visible : Visibility.Hidden;
         Waiting.Visibility = layer == Layer.Waiting ? Visibility.Visible : Visibility.Collapsed;
         Panel.Visibility = layer == Layer.Panel ? Visibility.Visible : Visibility.Collapsed;
         Banner.Visibility = layer == Layer.Medal ? Visibility.Visible : Visibility.Collapsed;
@@ -398,6 +400,10 @@ public partial class MainWindow : Window
         BannerSub.Text = $"Challenge {challenge.Number} — {challenge.Track}";
 
         ShowLayer(Layer.Medal);
+        Confetti.Burst(colors: [
+            (SolidColorBrush)FindResource(medal.ToString()),
+            (SolidColorBrush)FindResource("Ink"),
+        ]);
 
         _bannerTimer.Stop();
         _bannerTimer.Start();
