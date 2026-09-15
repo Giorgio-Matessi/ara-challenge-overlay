@@ -27,8 +27,17 @@ public partial class MainWindow : Window
     private const int WS_EX_TRANSPARENT = 0x00000020;
     private const int WS_EX_NOACTIVATE = 0x08000000;
 
+    private const int WM_HOTKEY = 0x0312;
+    private const int MOD_ALT = 0x0001;
+    private const int MOD_CONTROL = 0x0002;
+    private const int MOD_NOREPEAT = 0x4000;
+    private const int VK_L = 0x4C;
+    private const int LockHotkeyId = 1;
+
     [DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr hWnd, int index);
     [DllImport("user32.dll")] private static extern int SetWindowLong(IntPtr hWnd, int index, int value);
+    [DllImport("user32.dll")] private static extern bool RegisterHotKey(IntPtr hWnd, int id, int modifiers, int vk);
+    [DllImport("user32.dll")] private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
     private readonly Settings _settings = Settings.Load();
     private readonly ProgressStore _progress = new(JsonFile.PathIn("progress.json"));
@@ -38,6 +47,7 @@ public partial class MainWindow : Window
     private Forms.NotifyIcon? _tray;
     private Forms.ToolStripMenuItem? _lockItem;
     private IntPtr _hwnd;
+    private bool _hotkeyClaimed;
     private double? _lastLap;
     private bool _demo;
 
@@ -63,6 +73,7 @@ public partial class MainWindow : Window
         base.OnSourceInitialized(e);
         _hwnd = new WindowInteropHelper(this).Handle;
         ApplyWindowStyles();
+        ClaimLockHotkey();
         BuildTrayIcon();
 
         if (Environment.GetCommandLineArgs().Contains("--demo")) StartDemo();
@@ -82,6 +93,32 @@ public partial class MainWindow : Window
         Panel.BorderBrush = _settings.Locked
             ? new SolidColorBrush(Color.FromArgb(0x20, 0xFF, 0xFF, 0xFF))
             : new SolidColorBrush(Color.FromArgb(0xFF, 0x4C, 0xC2, 0xFF));
+    }
+
+    /// <summary>
+    /// Registers Ctrl+Alt+L system-wide, since the overlay never holds keyboard focus and never
+    /// sees an input binding. Failure means another program already owns it; the tray still works.
+    /// </summary>
+    private void ClaimLockHotkey()
+    {
+        _hotkeyClaimed = RegisterHotKey(_hwnd, LockHotkeyId, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_L);
+        if (_hotkeyClaimed) HwndSource.FromHwnd(_hwnd)?.AddHook(OnWindowMessage);
+    }
+
+    /// <summary>Catches the lock hotkey.</summary>
+    /// <param name="hwnd">Unused.</param>
+    /// <param name="message">The window message.</param>
+    /// <param name="wParam">The hotkey id, for WM_HOTKEY.</param>
+    /// <param name="lParam">Unused.</param>
+    /// <param name="handled">Set when the message was the lock hotkey.</param>
+    /// <returns>Zero; the message is handled through the flag.</returns>
+    private IntPtr OnWindowMessage(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (message != WM_HOTKEY || wParam.ToInt32() != LockHotkeyId) return IntPtr.Zero;
+
+        ToggleLock();
+        handled = true;
+        return IntPtr.Zero;
     }
 
     /// <summary>Drags the overlay while unlocked, saving where it lands.</summary>
@@ -120,6 +157,7 @@ public partial class MainWindow : Window
         _lockItem = new Forms.ToolStripMenuItem("Lock position (click-through)", null, (_, _) => ToggleLock())
         {
             Checked = _settings.Locked,
+            ShortcutKeyDisplayString = _hotkeyClaimed ? "Ctrl+Alt+L" : "",
         };
 
         var menu = new Forms.ContextMenuStrip();
@@ -150,11 +188,21 @@ public partial class MainWindow : Window
         _demo = true;
 
         var challenges = ChallengeCatalog.Embedded.Challenges.OrderBy(c => c.Number).ToList();
-        var step = 0;
+
+        // Opens on the waiting art, then an unmatched session, then the challenge cycle.
+        var step = -1;
 
         var demo = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
         demo.Tick += (_, _) =>
         {
+            if (step < 0)
+            {
+                step++;
+                HideBanner();
+                ShowUnmatched("track  0  \ncar    0  \ncond   dry");
+                return;
+            }
+
             var index = step / 2 % challenges.Count;
             var challenge = challenges[index];
             var medal = DemoTiers[index % DemoTiers.Length];
@@ -163,7 +211,6 @@ public partial class MainWindow : Window
             if (step % 2 == 0)
             {
                 HideBanner();
-                Root.Visibility = Visibility.Visible;
 
                 _lastLap = lap;
                 ShowChallenge(challenge, medal);
@@ -181,8 +228,7 @@ public partial class MainWindow : Window
 
         demo.Start();
 
-        Root.Visibility = Visibility.Visible;
-        ShowUnmatched("track  0  \ncar    0  \ncond   dry");
+        ShowLayer(Layer.Waiting);
     }
 
     /// <summary>Loads the tray icon at the size Windows wants.</summary>
@@ -212,13 +258,7 @@ public partial class MainWindow : Window
         _lastLap = null;
         HideBanner();
 
-        if (!_sdk.Connected)
-        {
-            Root.Visibility = Visibility.Collapsed;
-            return;
-        }
-
-        Root.Visibility = Visibility.Visible;
+        if (!_sdk.Connected) return;
 
         if (_sdk.Challenge is { } challenge)
         {
@@ -232,16 +272,25 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>Swaps between the challenge rows and the single id listing.</summary>
+    /// <param name="matched">True for the challenge panel, false for the ids.</param>
+    private void SetRowsVisible(bool matched)
+    {
+        var rows = matched ? Visibility.Visible : Visibility.Collapsed;
+
+        TrackText.Visibility = CarText.Visibility = rows;
+        HeaderDivider1.Visibility = HeaderDivider2.Visibility = rows;
+        GoalRow.Visibility = DeltaRow.Visibility = rows;
+        LapRow.Visibility = Targets.Visibility = rows;
+        StatusText.Visibility = matched ? Visibility.Collapsed : Visibility.Visible;
+    }
+
     /// <summary>Shows the ids the sim reported, for a track and car matching no challenge.</summary>
     /// <param name="detail">The lines to print under the title.</param>
     private void ShowUnmatched(string detail)
     {
         TitleText.Text = "NO ARA CHALLENGE FOR THIS COMBINATION";
-        TrackText.Visibility = CarText.Visibility = Visibility.Collapsed;
-        HeaderDivider1.Visibility = HeaderDivider2.Visibility = Visibility.Collapsed;
-        GoalRow.Visibility = DeltaRow.Visibility = Visibility.Collapsed;
-        LapRow.Visibility = Targets.Visibility = Visibility.Collapsed;
-        StatusText.Visibility = Visibility.Visible;
+        SetRowsVisible(false);
         StatusText.Text = detail;
     }
 
@@ -254,67 +303,57 @@ public partial class MainWindow : Window
         TrackText.Text = challenge.Track.ToUpperInvariant();
         CarText.Text = challenge.Car.ToUpperInvariant();
 
-        TrackText.Visibility = CarText.Visibility = Visibility.Visible;
-        HeaderDivider1.Visibility = HeaderDivider2.Visibility = Visibility.Visible;
-        GoalRow.Visibility = DeltaRow.Visibility = Visibility.Visible;
-        LapRow.Visibility = Targets.Visibility = Visibility.Visible;
-        StatusText.Visibility = Visibility.Collapsed;
+        SetRowsVisible(true);
 
         GoldTime.Text = TimeFormat.Format(challenge.GoldSeconds);
         SilverTime.Text = TimeFormat.Format(challenge.SilverSeconds);
         BronzeTime.Text = TimeFormat.Format(challenge.BronzeSeconds);
 
-        UpdateHeldMarks(challenge, held);
-        UpdateGoalAndDelta(challenge, held);
-        UpdateLapRow();
+        UpdateLiveRows(challenge, held ?? HeldMedal(challenge));
     }
 
+    /// <summary>Reads the best medal stored against a challenge.</summary>
+    /// <param name="challenge">The challenge to look up.</param>
+    /// <returns>The stored medal, or None.</returns>
+    private Medal HeldMedal(Challenge challenge) => _progress.Get(challenge.Number)?.BestMedal ?? Medal.None;
+
     /// <summary>
-    /// Sets the goal tier and the big delta between the last lap and that tier's target. Once
-    /// gold is held the goal stays gold, so the delta keeps meaning something.
+    /// Refills the rows that move as laps come in: the held ticks, the goal tier, the big delta
+    /// from the last lap to that tier's target, and the two lap times. Once gold is held the goal
+    /// stays gold, so the delta keeps meaning something.
     /// </summary>
     /// <param name="challenge">The challenge being shown.</param>
-    /// <param name="held">Which medal to treat as held; defaults to the stored progress.</param>
-    private void UpdateGoalAndDelta(Challenge challenge, Medal? held = null)
+    /// <param name="medal">The medal to treat as held.</param>
+    private void UpdateLiveRows(Challenge challenge, Medal medal)
     {
-        var medal = held ?? _progress.Get(challenge.Number)?.BestMedal ?? Medal.None;
+        GoldMark.Text = medal >= Medal.Gold ? "✓" : "";
+        SilverMark.Text = medal >= Medal.Silver ? "✓" : "";
+        BronzeMark.Text = medal >= Medal.Bronze ? "✓" : "";
+
         var goal = Challenge.NextTierAbove(medal) ?? Medal.Gold;
+        var target = challenge.TargetFor(goal);
 
         GoalTier.Text = goal.ToString().ToUpperInvariant();
         GoalTier.Foreground = (SolidColorBrush)FindResource(goal.ToString());
-        GoalTime.Text = TimeFormat.Format(challenge.TargetFor(goal));
+        GoalTime.Text = TimeFormat.Format(target);
+
+        SessionBestText.Text = _sdk.SessionBest is { } best ? TimeFormat.Format(best) : "—";
 
         if (_lastLap is not { } lap)
         {
+            LastLapText.Text = "—";
             DeltaText.Text = "—";
             DeltaText.Foreground = (SolidColorBrush)FindResource("Dim");
             return;
         }
 
-        var delta = lap - challenge.TargetFor(goal);
+        LastLapText.Text = TimeFormat.Format(lap);
+
+        var delta = lap - target;
         var behind = delta > 0;
 
         DeltaText.Text = delta.ToString("+0.000;-0.000", CultureInfo.InvariantCulture) + (behind ? "s ▼" : "s ▲");
         DeltaText.Foreground = (SolidColorBrush)FindResource(behind ? "Behind" : "Ahead");
-    }
-
-    /// <summary>Sets the last lap and session best times.</summary>
-    private void UpdateLapRow()
-    {
-        LastLapText.Text = _lastLap is { } lap ? TimeFormat.Format(lap) : "—";
-        SessionBestText.Text = _sdk.SessionBest is { } best ? TimeFormat.Format(best) : "—";
-    }
-
-    /// <summary>Ticks every tier at or below the medal held.</summary>
-    /// <param name="challenge">The challenge whose progress to read.</param>
-    /// <param name="held">Which medal to treat as held; defaults to the stored progress.</param>
-    private void UpdateHeldMarks(Challenge challenge, Medal? held = null)
-    {
-        var medal = held ?? _progress.Get(challenge.Number)?.BestMedal ?? Medal.None;
-
-        GoldMark.Text = medal >= Medal.Gold ? "✓" : "";
-        SilverMark.Text = medal >= Medal.Silver ? "✓" : "";
-        BronzeMark.Text = medal >= Medal.Bronze ? "✓" : "";
     }
 
     /// <summary>
@@ -355,9 +394,7 @@ public partial class MainWindow : Window
         var medal = challenge.MedalFor(lap.Seconds);
         var earnedNewTier = _progress.RecordLap(challenge.Number, lap.Seconds, medal);
 
-        UpdateHeldMarks(challenge);
-        UpdateGoalAndDelta(challenge);
-        UpdateLapRow();
+        UpdateLiveRows(challenge, HeldMedal(challenge));
 
         if (earnedNewTier) ShowBanner(medal, lap.Seconds, challenge);
     }
@@ -365,10 +402,25 @@ public partial class MainWindow : Window
     /// <summary>Tears down the tray icon and the SDK, then exits. The only shutdown path.</summary>
     private void Quit()
     {
+        if (_hotkeyClaimed) UnregisterHotKey(_hwnd, LockHotkeyId);
         if (_tray is not null) { _tray.Visible = false; _tray.Dispose(); _tray = null; }
         _sdk.Dispose();
         Application.Current.Shutdown();
     }
+
+    private enum Layer { Waiting, Panel, Medal }
+
+    /// <summary>Shows one layer and hides the other two.</summary>
+    /// <param name="layer">The layer to show.</param>
+    private void ShowLayer(Layer layer)
+    {
+        Waiting.Visibility = layer == Layer.Waiting ? Visibility.Visible : Visibility.Collapsed;
+        Panel.Visibility = layer == Layer.Panel ? Visibility.Visible : Visibility.Collapsed;
+        Banner.Visibility = layer == Layer.Medal ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>What shows when no medal banner is up: the panel, or the waiting art.</summary>
+    private Layer RestingLayer => _demo || _sdk.Connected ? Layer.Panel : Layer.Waiting;
 
     /// <summary>Shows the medal banner in place of the panel, for eight seconds.</summary>
     /// <param name="medal">The medal earned; None shows nothing.</param>
@@ -378,27 +430,23 @@ public partial class MainWindow : Window
     {
         if (medal == Medal.None) return;
 
-        var brush = (SolidColorBrush)FindResource(medal.ToString());
-
         BannerTitle.Text = medal.ToString().ToUpperInvariant();
-        BannerTitle.Foreground = brush;
-        Banner.BorderBrush = brush;
+        BannerArt.Background = (ImageBrush)FindResource($"{medal}Art");
+        Banner.BorderBrush = (SolidColorBrush)FindResource(medal.ToString());
         BannerTime.Text = TimeFormat.Format(seconds);
         BannerSub.Text = $"Challenge {challenge.Number} — {challenge.Track}";
 
-        Banner.Visibility = Visibility.Visible;
-        Panel.Visibility = Visibility.Collapsed;
+        ShowLayer(Layer.Medal);
 
         _bannerTimer.Stop();
         _bannerTimer.Start();
         if (!_demo) SystemSounds.Asterisk.Play();
     }
 
-    /// <summary>Puts the panel back. Safe when no banner is showing.</summary>
+    /// <summary>Drops back to the resting layer. Safe when no banner is showing.</summary>
     private void HideBanner()
     {
         _bannerTimer.Stop();
-        Banner.Visibility = Visibility.Collapsed;
-        Panel.Visibility = Visibility.Visible;
+        ShowLayer(RestingLayer);
     }
 }

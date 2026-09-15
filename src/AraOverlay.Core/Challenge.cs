@@ -32,21 +32,15 @@ public sealed class Challenge
     [JsonIgnore] public double SilverSeconds => TimeFormat.Parse(Silver);
     [JsonIgnore] public double BronzeSeconds => TimeFormat.Parse(Bronze);
 
-    private (Medal Medal, double Seconds)[] Tiers =>
-        [(Medal.Gold, GoldSeconds), (Medal.Silver, SilverSeconds), (Medal.Bronze, BronzeSeconds)];
-
     /// <summary>Grades a lap against the three targets.</summary>
     /// <param name="lapSeconds">The lap time; the SDK reports -1 when there isn't one.</param>
     /// <returns>The best medal the lap earns, or None.</returns>
-    public Medal MedalFor(double lapSeconds)
-    {
-        if (lapSeconds <= 0) return Medal.None;
-
-        foreach (var (medal, seconds) in Tiers)
-            if (lapSeconds <= seconds + DisplayTolerance) return medal;
-
-        return Medal.None;
-    }
+    public Medal MedalFor(double lapSeconds) =>
+        lapSeconds <= 0 ? Medal.None
+        : lapSeconds <= GoldSeconds + DisplayTolerance ? Medal.Gold
+        : lapSeconds <= SilverSeconds + DisplayTolerance ? Medal.Silver
+        : lapSeconds <= BronzeSeconds + DisplayTolerance ? Medal.Bronze
+        : Medal.None;
 
     /// <summary>Looks up one tier's target.</summary>
     /// <param name="medal">Gold, Silver or Bronze.</param>

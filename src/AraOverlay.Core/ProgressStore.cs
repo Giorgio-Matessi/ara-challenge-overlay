@@ -32,19 +32,19 @@ public sealed class ProgressStore
     public bool RecordLap(int challengeNumber, double seconds, Medal medal)
     {
         var previous = Get(challengeNumber);
+        var heldMedal = previous?.BestMedal ?? Medal.None;
 
-        var bestSeconds = previous is null ? seconds : Math.Min(previous.BestSeconds, seconds);
-        var bestMedal = previous is null ? medal : (Medal)Math.Max((int)medal, (int)previous.BestMedal);
-        var improvedTier = bestMedal > (previous?.BestMedal ?? Medal.None);
+        var updated = new ChallengeProgress(
+            Math.Min(previous?.BestSeconds ?? seconds, seconds),
+            medal > heldMedal ? medal : heldMedal);
 
-        var updated = new ChallengeProgress(bestSeconds, bestMedal);
         if (updated != previous)
         {
             _progress[challengeNumber] = updated;
             Save();
         }
 
-        return improvedTier;
+        return updated.BestMedal > heldMedal;
     }
 
     /// <summary>Writes the store to disk. A failed write is dropped.</summary>

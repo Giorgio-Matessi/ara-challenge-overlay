@@ -21,6 +21,12 @@
         <SolidColorBrush x:Key="Ahead"  Color="#5BD16A"/>
         <SolidColorBrush x:Key="Rule"   Color="#1AFFFFFF"/>
 
+        <!-- Medal banner backgrounds, keyed by medal name. Half opacity over the banner's dark
+             base: any more and the white text drops under 4.5:1 on gold and bronze. -->
+        <ImageBrush x:Key="GoldArt"   ImageSource="/assets/gold.png"   Stretch="UniformToFill" Opacity="0.5"/>
+        <ImageBrush x:Key="SilverArt" ImageSource="/assets/silver.png" Stretch="UniformToFill" Opacity="0.5"/>
+        <ImageBrush x:Key="BronzeArt" ImageSource="/assets/bronze.png" Stretch="UniformToFill" Opacity="0.5"/>
+
         <Style x:Key="Label" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="Segoe UI Semibold"/>
             <Setter Property="FontSize" Value="11"/>
@@ -46,17 +52,32 @@
         </Style>
     </Window.Resources>
 
-    <Grid x:Name="Root" Visibility="Collapsed">
+    <Grid x:Name="Root">
 
-        <!-- Standing panel -->
+        <!-- Shown until iRacing is running. The image is 1000x600, so it needs an explicit
+             width or it sizes the whole window: 340 is the panel's own content width. -->
+        <Image x:Name="Waiting"
+               Source="/assets/waiting-banner.png"
+               Width="340"
+               MouseLeftButtonDown="OnPanelDrag"/>
+
+        <!-- Standing panel. UniformToFill crops the art's own rounded corners away, so the
+             Border's CornerRadius does the rounding; Opacity matches the flat #D9 it replaced. -->
         <Border x:Name="Panel"
-                Background="#D910181C"
+                Visibility="Collapsed"
                 CornerRadius="10"
                 Padding="14,9"
                 BorderThickness="1"
                 BorderBrush="#20FFFFFF"
                 MouseLeftButtonDown="OnPanelDrag">
-            <StackPanel MinWidth="340" MaxWidth="560">
+            <Border.Background>
+                <ImageBrush ImageSource="/assets/background-image.png"
+                            Stretch="UniformToFill"
+                            Opacity="0.85"/>
+            </Border.Background>
+            <!-- Fixed, not Min/Max: the header's track and car sit in star columns, which still
+                 report their text width, so long names grew the panel. Names ellipsize instead. -->
+            <StackPanel Width="340">
 
                 <!-- Challenge | track | car -->
                 <Border Style="{StaticResource Row}" Padding="0,0,0,6">
@@ -178,21 +199,24 @@
                 Visibility="Collapsed"
                 Background="#F2101418"
                 CornerRadius="10"
-                Padding="22,16"
                 BorderThickness="2">
-            <StackPanel HorizontalAlignment="Center">
-                <TextBlock x:Name="BannerTitle"
-                           FontFamily="Segoe UI Black" FontSize="30"
-                           HorizontalAlignment="Center"/>
-                <TextBlock x:Name="BannerTime"
-                           FontFamily="Consolas" FontSize="22"
-                           Foreground="{StaticResource Ink}"
-                           HorizontalAlignment="Center" Margin="0,2,0,0"/>
-                <TextBlock x:Name="BannerSub"
-                           FontFamily="Segoe UI" FontSize="12"
-                           Foreground="{StaticResource Dim}"
-                           HorizontalAlignment="Center" Margin="0,4,0,0"/>
-            </StackPanel>
+            <Grid>
+                <Border x:Name="BannerArt" CornerRadius="8"/>
+                <StackPanel HorizontalAlignment="Center" Margin="22,16">
+                    <TextBlock x:Name="BannerTitle"
+                               FontFamily="Segoe UI Black" FontSize="30"
+                               Foreground="{StaticResource Ink}"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="BannerTime"
+                               FontFamily="Consolas" FontSize="22"
+                               Foreground="{StaticResource Ink}"
+                               HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                    <TextBlock x:Name="BannerSub"
+                               FontFamily="Segoe UI" FontSize="12"
+                               Foreground="{StaticResource Ink}"
+                               HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                </StackPanel>
+            </Grid>
         </Border>
     </Grid>
 </Window>

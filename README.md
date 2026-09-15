@@ -20,8 +20,8 @@ target times, and pops a banner the moment you set a clean lap quick enough to e
 Only one copy runs at a time — starting a second says so and exits, since two overlays would
 stack on screen and fight over the progress file.
 
-Run `AraChallengeOverlay.exe` and leave it running — it lives in the system tray and stays
-invisible until iRacing is up.
+Run `AraChallengeOverlay.exe` and leave it running — it lives in the system tray and shows the
+ARA mark until iRacing is up, so you can unlock it and drag it into place before a session.
 
 On a challenge's track and car, the panel reads top to bottom:
 
@@ -40,8 +40,12 @@ Right-click the tray icon for:
 
 | | |
 |---|---|
-| **Lock position (click-through)** | On by default. Unlock to drag the overlay somewhere else; lock again so the mouse passes through to the sim. |
+| **Lock position (click-through)** | On by default. Unlock to drag the overlay somewhere else; lock again so the mouse passes through to the sim. **Ctrl+Alt+L** does the same without leaving the sim. |
 | **Exit** | |
+
+Ctrl+Alt+L is registered system-wide, because the overlay never takes keyboard focus. If another
+program already owns that combination the registration fails, the tray menu stops showing the
+shortcut, and the menu item still works.
 
 A lap is only worth a medal if it's **clean**. Leaving the track surface, picking up incident
 points, or touching pit lane invalidates the lap, and the overlay says which one did it.
@@ -78,8 +82,8 @@ active challenge back and forth. A wet challenge simply won't match in the dry, 
 deliberate: its targets would be free golds on a dry track.
 
 Those ids aren't reliably guessable from a track or car name, so if a challenge never lights up:
-load it in the sim, use the tray's **Copy current track/car ID**, and paste the result over the
-row. The tests will catch out-of-order times and duplicate track+car pairs at build time.
+load it in the sim and read the ids straight off the overlay's unmatched panel, then paste them
+over the row. The tests will catch out-of-order times and duplicate track+car pairs at build time.
 
 ## Changing the icon
 
