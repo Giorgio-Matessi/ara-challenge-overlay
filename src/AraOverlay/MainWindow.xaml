@@ -75,7 +75,9 @@
                             Stretch="UniformToFill"
                             Opacity="0.85"/>
             </Border.Background>
-            <StackPanel MinWidth="340" MaxWidth="560">
+            <!-- Fixed, not Min/Max: the header's track and car sit in star columns, which still
+                 report their text width, so long names grew the panel. Names ellipsize instead. -->
+            <StackPanel Width="340">
 
                 <!-- Challenge | track | car -->
                 <Border Style="{StaticResource Row}" Padding="0,0,0,6">
