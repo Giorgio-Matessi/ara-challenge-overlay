@@ -28,6 +28,7 @@ public partial class MainWindow : Window
     private const int WS_EX_NOACTIVATE = 0x08000000;
 
     private const int WM_HOTKEY = 0x0312;
+    private const int MOD_ALT = 0x0001;
     private const int MOD_CONTROL = 0x0002;
     private const int MOD_NOREPEAT = 0x4000;
     private const int VK_L = 0x4C;
@@ -95,12 +96,12 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Registers Ctrl+L system-wide, since the overlay never holds keyboard focus and so never
+    /// Registers Ctrl+Alt+L system-wide, since the overlay never holds keyboard focus and never
     /// sees an input binding. Failure means another program already owns it; the tray still works.
     /// </summary>
     private void ClaimLockHotkey()
     {
-        _hotkeyClaimed = RegisterHotKey(_hwnd, LockHotkeyId, MOD_CONTROL | MOD_NOREPEAT, VK_L);
+        _hotkeyClaimed = RegisterHotKey(_hwnd, LockHotkeyId, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_L);
         if (_hotkeyClaimed) HwndSource.FromHwnd(_hwnd)?.AddHook(OnWindowMessage);
     }
 
@@ -156,7 +157,7 @@ public partial class MainWindow : Window
         _lockItem = new Forms.ToolStripMenuItem("Lock position (click-through)", null, (_, _) => ToggleLock())
         {
             Checked = _settings.Locked,
-            ShortcutKeyDisplayString = _hotkeyClaimed ? "Ctrl+L" : "",
+            ShortcutKeyDisplayString = _hotkeyClaimed ? "Ctrl+Alt+L" : "",
         };
 
         var menu = new Forms.ContextMenuStrip();

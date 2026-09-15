@@ -40,10 +40,10 @@ Right-click the tray icon for:
 
 | | |
 |---|---|
-| **Lock position (click-through)** | On by default. Unlock to drag the overlay somewhere else; lock again so the mouse passes through to the sim. **Ctrl+L** does the same without leaving the sim. |
+| **Lock position (click-through)** | On by default. Unlock to drag the overlay somewhere else; lock again so the mouse passes through to the sim. **Ctrl+Alt+L** does the same without leaving the sim. |
 | **Exit** | |
 
-Ctrl+L is registered system-wide, because the overlay never takes keyboard focus. If another
+Ctrl+Alt+L is registered system-wide, because the overlay never takes keyboard focus. If another
 program already owns that combination the registration fails, the tray menu stops showing the
 shortcut, and the menu item still works.
 
