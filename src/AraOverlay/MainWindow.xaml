@@ -21,6 +21,12 @@
         <SolidColorBrush x:Key="Ahead"  Color="#5BD16A"/>
         <SolidColorBrush x:Key="Rule"   Color="#1AFFFFFF"/>
 
+        <!-- Medal banner backgrounds, keyed by medal name. Half opacity over the banner's dark
+             base: any more and the white text drops under 4.5:1 on gold and bronze. -->
+        <ImageBrush x:Key="GoldArt"   ImageSource="/assets/gold.png"   Stretch="UniformToFill" Opacity="0.5"/>
+        <ImageBrush x:Key="SilverArt" ImageSource="/assets/silver.png" Stretch="UniformToFill" Opacity="0.5"/>
+        <ImageBrush x:Key="BronzeArt" ImageSource="/assets/bronze.png" Stretch="UniformToFill" Opacity="0.5"/>
+
         <Style x:Key="Label" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="Segoe UI Semibold"/>
             <Setter Property="FontSize" Value="11"/>
@@ -191,21 +197,24 @@
                 Visibility="Collapsed"
                 Background="#F2101418"
                 CornerRadius="10"
-                Padding="22,16"
                 BorderThickness="2">
-            <StackPanel HorizontalAlignment="Center">
-                <TextBlock x:Name="BannerTitle"
-                           FontFamily="Segoe UI Black" FontSize="30"
-                           HorizontalAlignment="Center"/>
-                <TextBlock x:Name="BannerTime"
-                           FontFamily="Consolas" FontSize="22"
-                           Foreground="{StaticResource Ink}"
-                           HorizontalAlignment="Center" Margin="0,2,0,0"/>
-                <TextBlock x:Name="BannerSub"
-                           FontFamily="Segoe UI" FontSize="12"
-                           Foreground="{StaticResource Dim}"
-                           HorizontalAlignment="Center" Margin="0,4,0,0"/>
-            </StackPanel>
+            <Grid>
+                <Border x:Name="BannerArt" CornerRadius="8"/>
+                <StackPanel HorizontalAlignment="Center" Margin="22,16">
+                    <TextBlock x:Name="BannerTitle"
+                               FontFamily="Segoe UI Black" FontSize="30"
+                               Foreground="{StaticResource Ink}"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="BannerTime"
+                               FontFamily="Consolas" FontSize="22"
+                               Foreground="{StaticResource Ink}"
+                               HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                    <TextBlock x:Name="BannerSub"
+                               FontFamily="Segoe UI" FontSize="12"
+                               Foreground="{StaticResource Ink}"
+                               HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                </StackPanel>
+            </Grid>
         </Border>
     </Grid>
 </Window>
