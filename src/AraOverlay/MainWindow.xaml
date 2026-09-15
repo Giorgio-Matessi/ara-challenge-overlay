@@ -55,15 +55,20 @@
                Width="340"
                MouseLeftButtonDown="OnPanelDrag"/>
 
-        <!-- Standing panel -->
+        <!-- Standing panel. UniformToFill crops the art's own rounded corners away, so the
+             Border's CornerRadius does the rounding; Opacity matches the flat #D9 it replaced. -->
         <Border x:Name="Panel"
                 Visibility="Collapsed"
-                Background="#D910181C"
                 CornerRadius="10"
                 Padding="14,9"
                 BorderThickness="1"
                 BorderBrush="#20FFFFFF"
                 MouseLeftButtonDown="OnPanelDrag">
+            <Border.Background>
+                <ImageBrush ImageSource="/assets/background-image.png"
+                            Stretch="UniformToFill"
+                            Opacity="0.85"/>
+            </Border.Background>
             <StackPanel MinWidth="340" MaxWidth="560">
 
                 <!-- Challenge | track | car -->

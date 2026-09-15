@@ -26,6 +26,7 @@
 
     <!-- Baked in, so the single-file exe still has it. Link fixes the pack URI the XAML uses. -->
     <Resource Include="..\..\assets\waiting-banner.png" Link="assets\waiting-banner.png" />
+    <Resource Include="..\..\assets\background-image.png" Link="assets\background-image.png" />
   </ItemGroup>
 
   <ItemGroup>
