@@ -46,10 +46,18 @@
         </Style>
     </Window.Resources>
 
-    <Grid x:Name="Root" Visibility="Collapsed">
+    <Grid x:Name="Root">
+
+        <!-- Shown until iRacing is running. The image is 1000x600, so it needs an explicit
+             width or it sizes the whole window: 340 is the panel's own content width. -->
+        <Image x:Name="Waiting"
+               Source="/assets/waiting-banner.png"
+               Width="340"
+               MouseLeftButtonDown="OnPanelDrag"/>
 
         <!-- Standing panel -->
         <Border x:Name="Panel"
+                Visibility="Collapsed"
                 Background="#D910181C"
                 CornerRadius="10"
                 Padding="14,9"
