@@ -391,11 +391,9 @@ public partial class MainWindow : Window
     {
         if (medal == Medal.None) return;
 
-        var brush = (SolidColorBrush)FindResource(medal.ToString());
-
         BannerTitle.Text = medal.ToString().ToUpperInvariant();
-        BannerTitle.Foreground = brush;
-        Banner.BorderBrush = brush;
+        BannerArt.Background = (ImageBrush)FindResource($"{medal}Art");
+        Banner.BorderBrush = (SolidColorBrush)FindResource(medal.ToString());
         BannerTime.Text = TimeFormat.Format(seconds);
         BannerSub.Text = $"Challenge {challenge.Number} — {challenge.Track}";
 
