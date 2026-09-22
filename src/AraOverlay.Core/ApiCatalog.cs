@@ -95,11 +95,11 @@ public static class ApiCatalog
             return;
         }
 
-        var number = item.TryGetProperty("position", out var position) && position.TryGetInt32(out var read)
-            ? read
+        var number = item.TryGetProperty("position", out var position) && position.TryGetInt32(out var declared)
+            ? declared
             : ordinal;
 
-        var read = cars.Select(car => new Challenge
+        var mapped = cars.Select(car => new Challenge
         {
             Number = number,
             ContentId = contentId,
@@ -116,7 +116,7 @@ public static class ApiCatalog
         // other nineteen away.
         try
         {
-            read.ForEach(c => c.Validate());
+            mapped.ForEach(c => c.Validate());
         }
         catch (InvalidDataException e)
         {
@@ -124,7 +124,7 @@ public static class ApiCatalog
             return;
         }
 
-        challenges.AddRange(read);
+        challenges.AddRange(mapped);
     }
 
     /// <summary>Reads the cars an item applies to, as iRacing ids.</summary>
