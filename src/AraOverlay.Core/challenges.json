@@ -3,10 +3,8 @@
 // trackIds is iRacing's WeekendInfo:TrackID — the layout, not the track package. More than
 //         one means the challenge counts on any of them: 11 and 18 accept either Spa build.
 // carId   is iRacing's DriverInfo:CarID
-//
-// Nothing marks a challenge wet. Only one track and car pair is used twice — 14 and 19, the same
-// car on the same Le Mans layout — and the overlay tells those apart by the wet one's targets
-// being 34 seconds slower. See ChallengeCatalog.
+// wet     marks the wet-weather challenges (16-20). Track and car alone are not enough:
+//         14 and 19 are the same car on the same Le Mans layout, dry and wet.
 //
 // Times are "M:SS.fff" and must satisfy gold < silver < bronze; the tests enforce that.
 [
@@ -131,13 +129,14 @@
     "bronze": "6:24.500", "silver": "6:22.500", "gold": "6:19.500"
   },
 
-  // 16-20 are run in the wet. Their targets are set for it; nothing in the data says so.
+  // 16-20 are the wet-weather challenges.
   {
     "number": 16,
     "track": "Oran Park Raceway (Grand Prix)",
     "car": "Ray FF1600",
     "trackIds": [202],
     "carId": 163,
+    "wet": true,
     "bronze": "1:17.000", "silver": "1:15.950", "gold": "1:15.450"
   },
   {
@@ -146,6 +145,7 @@
     "car": "Global Mazda MX-5 Cup",
     "trackIds": [9],
     "carId": 67,
+    "wet": true,
     "bronze": "1:31.300", "silver": "1:30.300", "gold": "1:29.800"
   },
   {
@@ -154,6 +154,7 @@
     "car": "Ferrari 296 GT3",
     "trackIds": [163, 523],
     "carId": 173,
+    "wet": true,
     "bronze": "2:49.800", "silver": "2:48.600", "gold": "2:47.900"
   },
   {
@@ -162,6 +163,7 @@
     "car": "Dallara P217",
     "trackIds": [268],
     "carId": 128,
+    "wet": true,
     "bronze": "4:13.700", "silver": "4:11.200", "gold": "4:10.200"
   },
   {
@@ -170,6 +172,7 @@
     "car": "Ray FF1600",
     "trackIds": [249],
     "carId": 163,
+    "wet": true,
     "bronze": "10:00.000", "silver": "9:20.000", "gold": "9:07.500"
   }
 ]

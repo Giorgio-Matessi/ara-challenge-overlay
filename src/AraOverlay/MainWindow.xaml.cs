@@ -1,11 +1,8 @@
-using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Media;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -46,19 +43,9 @@ public partial class MainWindow : Window
     private readonly ProgressStore _progress = new(JsonFile.PathIn("progress.json"));
     private readonly SdkService _sdk = new();
     private readonly DispatcherTimer _bannerTimer = new() { Interval = TimeSpan.FromSeconds(8) };
-    private readonly DispatcherTimer _loginTimer = new() { Interval = TimeSpan.FromSeconds(1) };
-    private readonly ApiClient _api = new();
-    private readonly DispatcherTimer _refreshTimer = new() { Interval = TimeSpan.FromMinutes(15) };
 
     private Forms.NotifyIcon? _tray;
     private Forms.ToolStripMenuItem? _lockItem;
-    private Forms.ToolStripMenuItem? _signInItem;
-    private Forms.ToolStripMenuItem? _copyCodeItem;
-    private Forms.ToolStripMenuItem? _matchItem;
-    private CancellationTokenSource? _loginCancel;
-    private LoginStatus _loginStatus = LoginStatus.Idle;
-    private DateTimeOffset _loginSettled;
-    private bool _refreshing;
     private IntPtr _hwnd;
     private bool _hotkeyClaimed;
     private double? _lastLap;
@@ -73,8 +60,6 @@ public partial class MainWindow : Window
         Top = _settings.Top;
 
         _bannerTimer.Tick += (_, _) => HideBanner();
-        _loginTimer.Tick += (_, _) => OnLoginTick();
-        _refreshTimer.Tick += (_, _) => RefreshCatalog();
 
         _sdk.StateChanged += () => Dispatcher.InvokeAsync(RenderState);
         _sdk.Tick += live => Dispatcher.InvokeAsync(() => OnTick(live));
@@ -91,17 +76,8 @@ public partial class MainWindow : Window
         ClaimLockHotkey();
         BuildTrayIcon();
 
-        if (Environment.GetCommandLineArgs().Contains("--demo"))
-        {
-            StartDemo();
-            return;
-        }
-
-        _sdk.SwapCatalog(CatalogCache.Resolve());
-        _sdk.Start();
-
-        _refreshTimer.Start();
-        RefreshCatalog();
+        if (Environment.GetCommandLineArgs().Contains("--demo")) StartDemo();
+        else _sdk.Start();
     }
 
     /// <summary>Sets click-through for the current lock state and colours the panel border.</summary>
@@ -184,26 +160,10 @@ public partial class MainWindow : Window
             ShortcutKeyDisplayString = _hotkeyClaimed ? "Ctrl+Alt+L" : "",
         };
 
-        _signInItem = new Forms.ToolStripMenuItem("Sign in…", null, (_, _) => ToggleSignIn());
-
-        // The panel can't be clicked while locked, so the code is copied from here instead.
-        _copyCodeItem = new Forms.ToolStripMenuItem("Copy code", null, (_, _) => CopyCode()) { Visible = false };
-
         var menu = new Forms.ContextMenuStrip();
-        menu.Items.Add(_signInItem);
-        menu.Items.Add(_copyCodeItem);
-        menu.Items.Add(new Forms.ToolStripMenuItem("Check for updates now", null, (_, _) => RefreshCatalog()));
-
-        // Shown only where more than one plan uses this track and car, which the sim cannot
-        // resolve: both are real challenges and only the driver knows which they are running.
-        _matchItem = new Forms.ToolStripMenuItem("Challenge") { Visible = false };
-        menu.Items.Add(_matchItem);
-        menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add(_lockItem);
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add(new Forms.ToolStripMenuItem("Exit", null, (_, _) => Quit()));
-
-        UpdateSignInItem();
 
         _tray = new Forms.NotifyIcon
         {
@@ -213,9 +173,6 @@ public partial class MainWindow : Window
             ContextMenuStrip = menu,
         };
     }
-
-    /// <summary>How long a finished login's message stays up before the panel moves on.</summary>
-    private static readonly TimeSpan SettledMessageFor = TimeSpan.FromSeconds(10);
 
     private static readonly Medal[] DemoTiers = [Medal.None, Medal.Bronze, Medal.Silver, Medal.Gold];
 
@@ -238,10 +195,6 @@ public partial class MainWindow : Window
         var demo = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
         demo.Tick += (_, _) =>
         {
-            // The cycle would otherwise redraw the panel over a login every 2.5 seconds, leaving
-            // the code flashing between challenge tiles for as long as it took to read it.
-            if (SigningIn || _loginStatus.Message.Length > 0) return;
-
             if (step < 0)
             {
                 step++;
@@ -305,17 +258,7 @@ public partial class MainWindow : Window
         _lastLap = null;
         HideBanner();
 
-        // Outranks the sim: signing in almost always happens before iRacing is running, and a
-        // login the member can't see is a login they think did nothing.
-        if (SigningIn || _loginStatus.Message.Length > 0)
-        {
-            ShowLogin();
-            return;
-        }
-
         if (!_sdk.Connected) return;
-
-        UpdateMatchItem();
 
         if (_sdk.Challenge is { } challenge)
         {
@@ -329,250 +272,17 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>Whether a login is open, which the panel outranks the sim state for.</summary>
-    private bool SigningIn => _loginStatus.State is LoginState.Starting or LoginState.WaitingForBrowser;
-
-    /// <summary>Starts a login, or cancels the one already running.</summary>
-    private void ToggleSignIn()
+    /// <summary>Swaps between the challenge rows and the single id listing.</summary>
+    /// <param name="matched">True for the challenge panel, false for the ids.</param>
+    private void SetRowsVisible(bool matched)
     {
-        if (SigningIn) { CancelLogin(); UpdateSignInItem(); RenderState(); return; }
-        if (TokenStore.Load() is { Usable: true }) { SignOut(); return; }
-
-        SignIn();
-    }
-
-    /// <summary>
-    /// Runs a login in the background. The controller raises its progress on whatever thread the
-    /// HTTP call finished on, so every report is marshalled back before it touches the panel.
-    /// </summary>
-    private void SignIn()
-    {
-        CancelLogin();
-        _loginCancel = new CancellationTokenSource();
-
-        var login = new LoginController(_api, OpenBrowser);
-        login.Changed += status => Dispatcher.InvokeAsync(() => OnLoginChanged(status));
-
-        var cancel = _loginCancel.Token;
-
-        _ = Task.Run(async () =>
-        {
-            var result = await login.Run(cancel).ConfigureAwait(false);
-            if (result is { } session) TokenStore.Save(new StoredSession(session.AccessToken, session.Expires));
-
-            await Dispatcher.InvokeAsync(() =>
-            {
-                UpdateSignInItem();
-                if (result is not null) RefreshCatalog();
-            });
-        }, cancel);
-    }
-
-    /// <summary>
-    /// Fetches the catalog in the background and stages it into the SDK. A failed refresh keeps
-    /// whatever is already loaded: the contract is that an upstream problem must never reach the
-    /// panel as a shorter list of challenges, and a driver mid-session would read that as one
-    /// being retired.
-    /// </summary>
-    private void RefreshCatalog()
-    {
-        if (_demo || _refreshing) return;
-        if (TokenStore.Load() is not { Usable: true } stored) return;
-
-        _refreshing = true;
-
-        _ = Task.Run(async () =>
-        {
-            CatalogFetch fetched;
-
-            try
-            {
-                fetched = await CatalogFetcher.Fetch(_api, stored.Token).ConfigureAwait(false);
-            }
-            catch (Exception e)
-            {
-                // Anything the fetcher didn't expect. Losing the flag here would stop every later
-                // refresh for the rest of the session, silently.
-                await Dispatcher.InvokeAsync(() => { _refreshing = false; Log($"{e.GetType().Name}: {e.Message}"); });
-                return;
-            }
-
-            await Dispatcher.InvokeAsync(() =>
-            {
-                _refreshing = false;
-
-                if (fetched.Skipped.Count > 0) Log(string.Join(Environment.NewLine, fetched.Skipped));
-
-                if (!fetched.Usable)
-                {
-                    if (fetched.Error is { } error) Log(error);
-                    return;
-                }
-
-                try
-                {
-                    // Built before it is cached: a catalog the lookup rejects must not replace a
-                    // good file on disk.
-                    var catalog = ChallengeCatalog.FromChallenges(fetched.Challenges);
-
-                    CatalogCache.Save(fetched.Challenges);
-                    _sdk.SwapCatalog(catalog);
-                }
-                catch (InvalidDataException e)
-                {
-                    // Two challenges the overlay could not tell apart. Keeping the old catalog is
-                    // the only safe answer; the log is how this gets reported to ARA.
-                    Log(e.Message);
-                }
-            });
-        });
-    }
-
-    /// <summary>Appends a line to %APPDATA%\AraOverlay\errors.log, the same file the SDK uses.</summary>
-    /// <param name="message">What to record.</param>
-    private static void Log(string message)
-    {
-        try
-        {
-            var path = JsonFile.PathIn("errors.log");
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            File.AppendAllText(path, $"{DateTime.Now:s}  {message}{Environment.NewLine}");
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-        }
-    }
-
-    /// <summary>Revokes the session with the server, then forgets it locally either way.</summary>
-    private void SignOut()
-    {
-        if (TokenStore.Load() is { } stored)
-            _ = Task.Run(() => _api.RevokeSession(stored.Token));
-
-        TokenStore.Clear();
-        UpdateSignInItem();
-    }
-
-    /// <summary>Stops a login in progress and clears the panel.</summary>
-    private void CancelLogin()
-    {
-        _loginCancel?.Cancel();
-        _loginCancel?.Dispose();
-        _loginCancel = null;
-        _loginStatus = LoginStatus.Idle;
-        _loginTimer.Stop();
-    }
-
-    /// <summary>Opens the Academy's verification page in the member's own browser.</summary>
-    /// <param name="uri">The https URI the API returned.</param>
-    private void OpenBrowser(string uri)
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
-        }
-        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
-        {
-            // No default browser. The code is still on the panel and the URI is on the page.
-        }
-    }
-
-    /// <summary>Takes a progress report from the login and redraws.</summary>
-    /// <param name="status">Where the login has got to.</param>
-    private void OnLoginChanged(LoginStatus status)
-    {
-        _loginStatus = status;
-
-        // A finished login only lingers if it has something to say; a successful one says nothing
-        // and the panel goes straight back to the challenge.
-        _loginSettled = status.State == LoginState.Failed ? DateTimeOffset.UtcNow : default;
-
-        _loginTimer.Stop();
-        if (SigningIn || status.Message.Length > 0) _loginTimer.Start();
-
-        if (_copyCodeItem is not null) _copyCodeItem.Visible = status.UserCode.Length > 0;
-
-        UpdateSignInItem();
-        RenderState();
-    }
-
-    /// <summary>Puts the code on the clipboard, for a panel that can't be clicked.</summary>
-    private void CopyCode()
-    {
-        if (_loginStatus.UserCode.Length == 0) return;
-
-        try
-        {
-            System.Windows.Clipboard.SetText(_loginStatus.UserCode);
-        }
-        catch (COMException)
-        {
-            // Another process has the clipboard open. The code is still readable on the panel.
-        }
-    }
-
-    /// <summary>Relabels the tray item for what clicking it would now do.</summary>
-    private void UpdateSignInItem()
-    {
-        if (_signInItem is null) return;
-
-        _signInItem.Text = SigningIn ? "Cancel sign-in"
-            : TokenStore.Load() is { Usable: true } ? "Sign out"
-            : "Sign in…";
-    }
-
-    /// <summary>
-    /// Runs the login panel's clock: the countdown while waiting, then clearing a finished
-    /// login so the panel goes back to the challenge rather than sitting on the message.
-    /// </summary>
-    private void OnLoginTick()
-    {
-        if (_loginSettled != default && DateTimeOffset.UtcNow - _loginSettled > SettledMessageFor)
-        {
-            _loginStatus = LoginStatus.Idle;
-            _loginSettled = default;
-            _loginTimer.Stop();
-            RenderState();
-            return;
-        }
-
-        ShowLogin();
-    }
-
-    /// <summary>Fills the login rows, including the countdown, which ticks once a second.</summary>
-    private void ShowLogin()
-    {
-        TitleText.Text = "ARA CHALLENGE OVERLAY";
-        SetPanelMode(PanelMode.SigningIn);
-
-        // Spaced, because it is being retyped by hand into a browser on the same screen.
-        LoginCode.Text = _loginStatus.UserCode.Length == 8
-            ? _loginStatus.UserCode.Insert(4, " ")
-            : _loginStatus.UserCode;
-
-        LoginPrompt.Visibility = _loginStatus.UserCode.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
-
-        var left = _loginStatus.Expires - DateTimeOffset.UtcNow;
-
-        LoginMessage.Text = _loginStatus.State == LoginState.WaitingForBrowser && left > TimeSpan.Zero
-            ? $"{_loginStatus.Message}  ·  {left:m\\:ss} left"
-            : _loginStatus.Message;
-    }
-
-    private enum PanelMode { Challenge, Unmatched, SigningIn }
-
-    /// <summary>Swaps between the challenge rows, the id listing, and the login code.</summary>
-    /// <param name="mode">Which of the three the panel is showing.</param>
-    private void SetPanelMode(PanelMode mode)
-    {
-        var rows = mode == PanelMode.Challenge ? Visibility.Visible : Visibility.Collapsed;
+        var rows = matched ? Visibility.Visible : Visibility.Collapsed;
 
         TrackText.Visibility = CarText.Visibility = rows;
         HeaderDivider1.Visibility = HeaderDivider2.Visibility = rows;
         GoalRow.Visibility = DeltaRow.Visibility = rows;
         LapRow.Visibility = Targets.Visibility = rows;
-        StatusText.Visibility = mode == PanelMode.Unmatched ? Visibility.Visible : Visibility.Collapsed;
-        Login.Visibility = mode == PanelMode.SigningIn ? Visibility.Visible : Visibility.Collapsed;
+        StatusText.Visibility = matched ? Visibility.Collapsed : Visibility.Visible;
     }
 
     /// <summary>Shows the ids the sim reported, for a track and car matching no challenge.</summary>
@@ -580,7 +290,7 @@ public partial class MainWindow : Window
     private void ShowUnmatched(string detail)
     {
         TitleText.Text = "NO ARA CHALLENGE FOR THIS COMBINATION";
-        SetPanelMode(PanelMode.Unmatched);
+        SetRowsVisible(false);
         StatusText.Text = detail;
     }
 
@@ -589,13 +299,11 @@ public partial class MainWindow : Window
     /// <param name="held">Which medals to treat as held; defaults to the stored progress.</param>
     private void ShowChallenge(Challenge challenge, Medal? held = null)
     {
-        TitleText.Text = challenge.Plan.Length > 0
-            ? $"{challenge.Plan.ToUpperInvariant()}  ·  {challenge.Number}{(_sdk.IsWet ? "  ·  WET" : "")}"
-            : $"CHALLENGE {challenge.Number}{(_sdk.IsWet ? "  ·  WET" : "")}";
+        TitleText.Text = $"CHALLENGE {challenge.Number}{(challenge.Wet ? "  ·  WET" : "")}";
         TrackText.Text = challenge.Track.ToUpperInvariant();
         CarText.Text = challenge.Car.ToUpperInvariant();
 
-        SetPanelMode(PanelMode.Challenge);
+        SetRowsVisible(true);
 
         GoldTime.Text = TimeFormat.Format(challenge.GoldSeconds);
         SilverTime.Text = TimeFormat.Format(challenge.SilverSeconds);
@@ -604,38 +312,10 @@ public partial class MainWindow : Window
         UpdateLiveRows(challenge, held ?? HeldMedal(challenge));
     }
 
-    /// <summary>
-    /// Rebuilds the tray's challenge picker. It appears only when this track and car belong to
-    /// more than one plan, which is the one case the overlay cannot decide on its own.
-    /// </summary>
-    private void UpdateMatchItem()
-    {
-        if (_matchItem is null) return;
-
-        _matchItem.Visible = _sdk.Matches.Count > 1;
-        _matchItem.DropDownItems.Clear();
-
-        if (!_matchItem.Visible) return;
-
-        for (var i = 0; i < _sdk.Matches.Count; i++)
-        {
-            var match = _sdk.Matches[i];
-            var index = i;
-
-            _matchItem.DropDownItems.Add(new Forms.ToolStripMenuItem(
-                match.Plan.Length > 0 ? $"{match.Plan} — {match.Number}" : $"Challenge {match.Number}",
-                null,
-                (_, _) => _sdk.SelectMatch(index))
-            {
-                Checked = ReferenceEquals(match, _sdk.Challenge),
-            });
-        }
-    }
-
     /// <summary>Reads the best medal stored against a challenge.</summary>
     /// <param name="challenge">The challenge to look up.</param>
     /// <returns>The stored medal, or None.</returns>
-    private Medal HeldMedal(Challenge challenge) => _progress.Get(challenge.Key)?.BestMedal ?? Medal.None;
+    private Medal HeldMedal(Challenge challenge) => _progress.Get(challenge.Number)?.BestMedal ?? Medal.None;
 
     /// <summary>
     /// Refills the rows that move as laps come in: the held ticks, the goal tier, the big delta
@@ -712,7 +392,7 @@ public partial class MainWindow : Window
         _lastLap = lap.Seconds;
 
         var medal = challenge.MedalFor(lap.Seconds);
-        var earnedNewTier = _progress.RecordLap(challenge.Key, lap.Seconds, medal);
+        var earnedNewTier = _progress.RecordLap(challenge.Number, lap.Seconds, medal);
 
         UpdateLiveRows(challenge, HeldMedal(challenge));
 
@@ -724,9 +404,6 @@ public partial class MainWindow : Window
     {
         if (_hotkeyClaimed) UnregisterHotKey(_hwnd, LockHotkeyId);
         if (_tray is not null) { _tray.Visible = false; _tray.Dispose(); _tray = null; }
-        CancelLogin();
-        _refreshTimer.Stop();
-        _api.Dispose();
         _sdk.Dispose();
         Application.Current.Shutdown();
     }
@@ -743,8 +420,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>What shows when no medal banner is up: the panel, or the waiting art.</summary>
-    private Layer RestingLayer =>
-        _demo || _sdk.Connected || SigningIn || _loginStatus.Message.Length > 0 ? Layer.Panel : Layer.Waiting;
+    private Layer RestingLayer => _demo || _sdk.Connected ? Layer.Panel : Layer.Waiting;
 
     /// <summary>Shows the medal banner in place of the panel, for eight seconds.</summary>
     /// <param name="medal">The medal earned; None shows nothing.</param>

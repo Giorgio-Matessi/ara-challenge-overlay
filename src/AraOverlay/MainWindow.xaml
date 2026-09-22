@@ -191,25 +191,6 @@
                            FontFamily="Consolas" FontSize="12"
                            Foreground="{StaticResource Dim}"
                            TextWrapping="Wrap"/>
-
-                <!-- Shown instead of the rows above while a login is open. There is no button:
-                     the panel is click-through when locked, so the tray drives this. -->
-                <StackPanel x:Name="Login" Visibility="Collapsed" Margin="0,7,0,1">
-                    <TextBlock x:Name="LoginPrompt"
-                               Style="{StaticResource Label}"
-                               Foreground="{StaticResource Dim}"
-                               HorizontalAlignment="Center"
-                               Text="ENTER THIS CODE IN YOUR BROWSER"/>
-                    <TextBlock x:Name="LoginCode"
-                               FontFamily="Consolas" FontSize="34" FontWeight="Bold"
-                               Foreground="{StaticResource Ink}"
-                               HorizontalAlignment="Center" Margin="0,4"/>
-                    <TextBlock x:Name="LoginMessage"
-                               FontFamily="Segoe UI" FontSize="11"
-                               Foreground="{StaticResource Dim}"
-                               HorizontalAlignment="Center"
-                               TextWrapping="Wrap" TextAlignment="Center"/>
-                </StackPanel>
             </StackPanel>
         </Border>
 
