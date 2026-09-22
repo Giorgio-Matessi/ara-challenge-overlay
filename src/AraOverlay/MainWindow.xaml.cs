@@ -299,7 +299,7 @@ public partial class MainWindow : Window
     /// <param name="held">Which medals to treat as held; defaults to the stored progress.</param>
     private void ShowChallenge(Challenge challenge, Medal? held = null)
     {
-        TitleText.Text = $"CHALLENGE {challenge.Number}{(challenge.Wet ? "  ·  WET" : "")}";
+        TitleText.Text = $"CHALLENGE {challenge.Number}{(_sdk.IsWet ? "  ·  WET" : "")}";
         TrackText.Text = challenge.Track.ToUpperInvariant();
         CarText.Text = challenge.Car.ToUpperInvariant();
 
@@ -315,7 +315,7 @@ public partial class MainWindow : Window
     /// <summary>Reads the best medal stored against a challenge.</summary>
     /// <param name="challenge">The challenge to look up.</param>
     /// <returns>The stored medal, or None.</returns>
-    private Medal HeldMedal(Challenge challenge) => _progress.Get(challenge.Number)?.BestMedal ?? Medal.None;
+    private Medal HeldMedal(Challenge challenge) => _progress.Get(challenge.Key)?.BestMedal ?? Medal.None;
 
     /// <summary>
     /// Refills the rows that move as laps come in: the held ticks, the goal tier, the big delta
@@ -392,7 +392,7 @@ public partial class MainWindow : Window
         _lastLap = lap.Seconds;
 
         var medal = challenge.MedalFor(lap.Seconds);
-        var earnedNewTier = _progress.RecordLap(challenge.Number, lap.Seconds, medal);
+        var earnedNewTier = _progress.RecordLap(challenge.Key, lap.Seconds, medal);
 
         UpdateLiveRows(challenge, HeldMedal(challenge));
 

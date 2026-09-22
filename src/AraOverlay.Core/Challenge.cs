@@ -11,7 +11,8 @@ public enum Medal
 }
 
 /// <summary>
-/// One ARA challenge: a fixed track, car and condition with three lap-time targets.
+/// One ARA challenge: a fixed track and car with three lap-time targets. Nothing here records
+/// wet or dry — see ChallengeCatalog for why the targets themselves carry that.
 /// </summary>
 public sealed class Challenge
 {
@@ -22,11 +23,14 @@ public sealed class Challenge
     public string Car { get; init; } = "";
     public int[] TrackIds { get; init; } = [];
     public int CarId { get; init; }
-    public bool Wet { get; init; }
+    public string ContentId { get; init; } = "";
 
     public string Gold { get; init; } = "";
     public string Silver { get; init; } = "";
     public string Bronze { get; init; } = "";
+
+    /// <summary>What stored progress is filed under: the API's content id, or a local stand-in.</summary>
+    [JsonIgnore] public string Key => ContentId.Length > 0 ? ContentId : $"local:{Number}";
 
     [JsonIgnore] public double GoldSeconds => TimeFormat.Parse(Gold);
     [JsonIgnore] public double SilverSeconds => TimeFormat.Parse(Silver);
