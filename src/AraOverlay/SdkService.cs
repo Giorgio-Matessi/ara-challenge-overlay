@@ -22,7 +22,8 @@ public sealed class SdkService : IDisposable
     private readonly IRacingSdk _sdk = new();
     private readonly LapTracker _tracker = new();
     private readonly ConditionTracker _conditions = new();
-    private readonly ChallengeCatalog _catalog = ChallengeCatalog.Embedded;
+    private ChallengeCatalog _catalog = ChallengeCatalog.Embedded;
+    private ChallengeCatalog? _staged;
 
     private static readonly TimeSpan RestartDelay = TimeSpan.FromSeconds(2);
 
@@ -177,9 +178,27 @@ public sealed class SdkService : IDisposable
         }
     }
 
+    /// <summary>
+    /// Hands over a newly fetched catalog. It is staged rather than applied: swapping targets
+    /// under a driver mid-lap would move the numbers on the panel and grade the lap against rows
+    /// they never saw. It takes effect at the next moment no challenge is live.
+    /// </summary>
+    /// <param name="catalog">The catalog to move to.</param>
+    public void SwapCatalog(ChallengeCatalog catalog)
+    {
+        _staged = catalog;
+        if (Challenge is null) Rematch();
+    }
+
     /// <summary>Re-runs the lookup, for a session change or a flip between wet and dry.</summary>
     private void Rematch()
     {
+        if (_staged is { } next && Challenge is null)
+        {
+            _catalog = next;
+            _staged = null;
+        }
+
         Challenge = _catalog.Find(TrackId, CarId, _conditions.IsWet);
         StateChanged?.Invoke();
     }

@@ -48,6 +48,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _bannerTimer = new() { Interval = TimeSpan.FromSeconds(8) };
     private readonly DispatcherTimer _loginTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly ApiClient _api = new();
+    private readonly DispatcherTimer _refreshTimer = new() { Interval = TimeSpan.FromMinutes(15) };
 
     private Forms.NotifyIcon? _tray;
     private Forms.ToolStripMenuItem? _lockItem;
@@ -56,6 +57,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _loginCancel;
     private LoginStatus _loginStatus = LoginStatus.Idle;
     private DateTimeOffset _loginSettled;
+    private bool _refreshing;
     private IntPtr _hwnd;
     private bool _hotkeyClaimed;
     private double? _lastLap;
@@ -71,6 +73,7 @@ public partial class MainWindow : Window
 
         _bannerTimer.Tick += (_, _) => HideBanner();
         _loginTimer.Tick += (_, _) => OnLoginTick();
+        _refreshTimer.Tick += (_, _) => RefreshCatalog();
 
         _sdk.StateChanged += () => Dispatcher.InvokeAsync(RenderState);
         _sdk.Tick += live => Dispatcher.InvokeAsync(() => OnTick(live));
@@ -87,8 +90,17 @@ public partial class MainWindow : Window
         ClaimLockHotkey();
         BuildTrayIcon();
 
-        if (Environment.GetCommandLineArgs().Contains("--demo")) StartDemo();
-        else _sdk.Start();
+        if (Environment.GetCommandLineArgs().Contains("--demo"))
+        {
+            StartDemo();
+            return;
+        }
+
+        _sdk.SwapCatalog(CatalogCache.Resolve());
+        _sdk.Start();
+
+        _refreshTimer.Start();
+        RefreshCatalog();
     }
 
     /// <summary>Sets click-through for the current lock state and colours the panel border.</summary>
@@ -179,6 +191,7 @@ public partial class MainWindow : Window
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add(_signInItem);
         menu.Items.Add(_copyCodeItem);
+        menu.Items.Add(new Forms.ToolStripMenuItem("Check for updates now", null, (_, _) => RefreshCatalog()));
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add(_lockItem);
         menu.Items.Add(new Forms.ToolStripSeparator());
@@ -339,8 +352,87 @@ public partial class MainWindow : Window
             var result = await login.Run(cancel).ConfigureAwait(false);
             if (result is { } session) TokenStore.Save(new StoredSession(session.AccessToken, session.Expires));
 
-            await Dispatcher.InvokeAsync(UpdateSignInItem);
+            await Dispatcher.InvokeAsync(() =>
+            {
+                UpdateSignInItem();
+                if (result is not null) RefreshCatalog();
+            });
         }, cancel);
+    }
+
+    /// <summary>
+    /// Fetches the catalog in the background and stages it into the SDK. A failed refresh keeps
+    /// whatever is already loaded: the contract is that an upstream problem must never reach the
+    /// panel as a shorter list of challenges, and a driver mid-session would read that as one
+    /// being retired.
+    /// </summary>
+    private void RefreshCatalog()
+    {
+        if (_demo || _refreshing) return;
+        if (TokenStore.Load() is not { Usable: true } stored) return;
+
+        _refreshing = true;
+
+        _ = Task.Run(async () =>
+        {
+            CatalogFetch fetched;
+
+            try
+            {
+                fetched = await CatalogFetcher.Fetch(_api, stored.Token).ConfigureAwait(false);
+            }
+            catch (Exception e)
+            {
+                // Anything the fetcher didn't expect. Losing the flag here would stop every later
+                // refresh for the rest of the session, silently.
+                await Dispatcher.InvokeAsync(() => { _refreshing = false; Log($"{e.GetType().Name}: {e.Message}"); });
+                return;
+            }
+
+            await Dispatcher.InvokeAsync(() =>
+            {
+                _refreshing = false;
+
+                if (fetched.Skipped.Count > 0) Log(string.Join(Environment.NewLine, fetched.Skipped));
+
+                if (!fetched.Usable)
+                {
+                    if (fetched.Error is { } error) Log(error);
+                    return;
+                }
+
+                try
+                {
+                    // Built before it is cached: a catalog the lookup rejects must not replace a
+                    // good file on disk.
+                    var catalog = ChallengeCatalog.FromChallenges(fetched.Challenges);
+
+                    CatalogCache.Save(fetched.Challenges);
+                    _sdk.SwapCatalog(catalog);
+                }
+                catch (InvalidDataException e)
+                {
+                    // Two challenges the overlay could not tell apart. Keeping the old catalog is
+                    // the only safe answer; the log is how this gets reported to ARA.
+                    Log(e.Message);
+                }
+            });
+        });
+    }
+
+    /// <summary>Appends a line to %APPDATA%\AraOverlay\errors.log, the same file the SDK uses.</summary>
+    /// <param name="message">What to record.</param>
+    private static void Log(string message)
+    {
+        try
+        {
+            var path = JsonFile.PathIn("errors.log");
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.AppendAllText(path, $"{DateTime.Now:s}  {message}{Environment.NewLine}");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     /// <summary>Revokes the session with the server, then forgets it locally either way.</summary>
@@ -595,6 +687,7 @@ public partial class MainWindow : Window
         if (_hotkeyClaimed) UnregisterHotKey(_hwnd, LockHotkeyId);
         if (_tray is not null) { _tray.Visible = false; _tray.Dispose(); _tray = null; }
         CancelLogin();
+        _refreshTimer.Stop();
         _api.Dispose();
         _sdk.Dispose();
         Application.Current.Shutdown();
