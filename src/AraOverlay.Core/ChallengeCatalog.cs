@@ -8,10 +8,14 @@ namespace AraOverlay.Core;
 /// track and car.
 ///
 /// Wet is deliberately not part of the key. The ARA Labs API carries no weather field and cannot
-/// gain one, so a challenge's conditions have to be read off its targets: exactly one track and
-/// car combination is used twice — Le Mans, challenges 14 and 19 — and the wet one is 34 seconds
-/// slower. Everywhere else a track and car identify a challenge on their own, and the league
-/// session sets the weather anyway.
+/// gain one, so a challenge's conditions are read off its targets: within one plan, a track and
+/// car used twice is the wet and dry pair, and the wet one is slower. The league session sets the
+/// weather anyway.
+///
+/// Across plans it means nothing. ARA runs several series and they share circuits and cars — two
+/// plans both using Summit Point in an MX-5 are two different dry challenges, and no telemetry
+/// can say which one a driver is attempting. So a lookup returns one candidate per plan and the
+/// driver picks.
 /// </summary>
 public sealed class ChallengeCatalog
 {
@@ -45,7 +49,9 @@ public sealed class ChallengeCatalog
             }
         }
 
-        foreach (var (key, sharing) in _byCombination) Ambiguous(key, sharing);
+        foreach (var (key, sharing) in _byCombination)
+            foreach (var plan in sharing.GroupBy(c => c.Plan, StringComparer.Ordinal))
+                Ambiguous(key, [.. plan]);
     }
 
     /// <summary>Rejects a combination the overlay could not resolve from a live session.</summary>
@@ -60,8 +66,8 @@ public sealed class ChallengeCatalog
 
         if (sharing.Count > 2)
             throw new InvalidDataException(
-                $"Challenges {named} all use track {key.Track} with car {key.Car}. Wet and dry " +
-                "is the only split the overlay can resolve.");
+                $"Challenges {named} all use track {key.Track} with car {key.Car} in the same " +
+                "plan. Wet and dry is the only split the overlay can resolve.");
 
         if (sharing.Count == 2 && Math.Abs(sharing[0].BronzeSeconds - sharing[1].BronzeSeconds) < 0.001)
             throw new InvalidDataException(
@@ -88,20 +94,30 @@ public sealed class ChallengeCatalog
     /// <exception cref="InvalidDataException">A row is unusable, or a combination is ambiguous.</exception>
     public static ChallengeCatalog FromChallenges(IReadOnlyList<Challenge> challenges) => new(challenges);
 
-    /// <summary>Matches a live session to a challenge, using wetness only to break a tie.</summary>
+    /// <summary>
+    /// Matches a live session, returning one candidate per plan. Wetness picks between a plan's
+    /// own wet and dry rows; it says nothing about two plans that happen to share a circuit.
+    /// </summary>
     /// <param name="trackId">WeekendInfo:TrackID.</param>
     /// <param name="carId">The player's DriverInfo:Drivers:CarID.</param>
     /// <param name="wet">Whether the session counts as wet.</param>
-    /// <returns>The matching challenge, or null.</returns>
-    public Challenge? Find(int trackId, int carId, bool wet) =>
-        _byCombination.GetValueOrDefault((trackId, carId)) switch
-        {
-            null or [] => null,
-            [var only] => only,
-            var sharing => wet
-                ? sharing.MaxBy(c => c.BronzeSeconds)
-                : sharing.MinBy(c => c.BronzeSeconds),
-        };
+    /// <returns>A challenge per plan that uses this track and car, in plan order. May be empty.</returns>
+    public IReadOnlyList<Challenge> Find(int trackId, int carId, bool wet)
+    {
+        if (_byCombination.GetValueOrDefault((trackId, carId)) is not { Count: > 0 } sharing)
+            return [];
+
+        return
+        [
+            .. sharing
+                .GroupBy(c => c.Plan, StringComparer.Ordinal)
+                .Select(plan => plan.Count() == 1
+                    ? plan.First()
+                    : wet
+                        ? plan.MaxBy(c => c.BronzeSeconds)!
+                        : plan.MinBy(c => c.BronzeSeconds)!)
+        ];
+    }
 
     /// <summary>Reads the challenges.json compiled into this assembly.</summary>
     /// <returns>The catalog it describes.</returns>

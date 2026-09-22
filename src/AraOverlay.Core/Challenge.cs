@@ -13,6 +13,9 @@ public enum Medal
 /// <summary>
 /// One ARA challenge: a fixed track and car with three lap-time targets. Nothing here records
 /// wet or dry — see ChallengeCatalog for why the targets themselves carry that.
+///
+/// Number is only unique inside a plan: ARA runs several, and each numbers its own challenges
+/// from one. Plan and Number together name a challenge; ContentId identifies it.
 /// </summary>
 public sealed class Challenge
 {
@@ -24,6 +27,9 @@ public sealed class Challenge
     public int[] TrackIds { get; init; } = [];
     public int CarId { get; init; }
     public string ContentId { get; init; } = "";
+
+    /// <summary>The training plan this came from; empty for the embedded rows.</summary>
+    public string Plan { get; init; } = "";
 
     public string Gold { get; init; } = "";
     public string Silver { get; init; } = "";

@@ -28,6 +28,7 @@ public sealed class SdkService : IDisposable
     private static readonly TimeSpan RestartDelay = TimeSpan.FromSeconds(2);
 
     private string _lastLogged = "";
+    private int _selected;
     private int _restarting;
 
     public bool Connected { get; private set; }
@@ -37,7 +38,11 @@ public sealed class SdkService : IDisposable
     public string CarName { get; private set; } = "";
     public bool IsWet => _conditions.IsWet;
     public double? SessionBest => _tracker.SessionBestSeconds;
-    public Challenge? Challenge { get; private set; }
+    /// <summary>Every challenge this track and car could be, one per plan.</summary>
+    public IReadOnlyList<Challenge> Matches { get; private set; } = [];
+
+    /// <summary>Which of the matches the panel is showing.</summary>
+    public Challenge? Challenge => _selected < Matches.Count ? Matches[_selected] : null;
 
     public event Action? StateChanged;
     public event Action<LiveLap>? Tick;
@@ -117,7 +122,8 @@ public sealed class SdkService : IDisposable
     private void HandleDisconnected()
     {
         Connected = false;
-        Challenge = null;
+        Matches = [];
+        _selected = 0;
         TrackId = CarId = 0;
         TrackName = CarName = "";
         _tracker.Reset();
@@ -190,6 +196,18 @@ public sealed class SdkService : IDisposable
         if (Challenge is null) Rematch();
     }
 
+    /// <summary>
+    /// Picks a different one of the current matches, for a track and car more than one plan uses.
+    /// </summary>
+    /// <param name="index">Which match to show.</param>
+    public void SelectMatch(int index)
+    {
+        if (index < 0 || index >= Matches.Count) return;
+
+        _selected = index;
+        StateChanged?.Invoke();
+    }
+
     /// <summary>Re-runs the lookup, for a session change or a flip between wet and dry.</summary>
     private void Rematch()
     {
@@ -199,7 +217,15 @@ public sealed class SdkService : IDisposable
             _staged = null;
         }
 
-        Challenge = _catalog.Find(TrackId, CarId, _conditions.IsWet);
+        var found = _catalog.Find(TrackId, CarId, _conditions.IsWet);
+
+        // Keeps the driver's pick across a wet/dry flip or a session change where the same plans
+        // still apply; anything else starts from the first again.
+        var keep = Challenge?.Plan;
+
+        Matches = found;
+        _selected = keep is null ? 0 : Math.Max(0, found.ToList().FindIndex(c => c.Plan == keep));
+
         StateChanged?.Invoke();
     }
 

@@ -94,11 +94,16 @@ public static class CatalogFetcher
                 continue;
             }
 
+            // Only within the same plan. Two plans using the same circuit and car are two real
+            // challenges a driver could be attempting, and the lookup offers both rather than
+            // picking one on their behalf.
             var twin = challenge.TrackIds
                 .Select(track => byCombination.GetValueOrDefault((track, challenge.CarId)))
                 .OfType<List<Challenge>>()
                 .SelectMany(sharing => sharing)
-                .FirstOrDefault(other => Math.Abs(other.BronzeSeconds - challenge.BronzeSeconds) < 0.001);
+                .FirstOrDefault(other =>
+                    string.Equals(other.Plan, challenge.Plan, StringComparison.Ordinal) &&
+                    Math.Abs(other.BronzeSeconds - challenge.BronzeSeconds) < 0.001);
 
             if (twin is not null)
             {

@@ -18,8 +18,8 @@ public class ChallengeCatalogTests
     public void Find_MatchesOnTrackAndCar()
     {
         var catalog = ChallengeCatalog.FromJson(TwoRows);
-        Assert.Equal(1, catalog.Find(299, 142, wet: false)!.Number);
-        Assert.Equal(2, catalog.Find(181, 67, wet: false)!.Number);
+        Assert.Equal(1, Assert.Single(catalog.Find(299, 142, wet: false)).Number);
+        Assert.Equal(2, Assert.Single(catalog.Find(181, 67, wet: false)).Number);
     }
 
     [Theory]
@@ -28,9 +28,9 @@ public class ChallengeCatalogTests
     [InlineData(500, 142)]
     [InlineData(0, 0)]
     [InlineData(-1, -1)]
-    public void Find_ReturnsNullWhenNothingMatches(int track, int car)
+    public void Find_ReturnsNothingWhenNothingMatches(int track, int car)
     {
-        Assert.Null(ChallengeCatalog.FromJson(TwoRows).Find(track, car, wet: false));
+        Assert.Empty(ChallengeCatalog.FromJson(TwoRows).Find(track, car, wet: false));
     }
 
     [Fact]
@@ -81,8 +81,8 @@ public class ChallengeCatalogTests
         """;
 
         var catalog = ChallengeCatalog.FromJson(lemans);
-        Assert.Equal(14, catalog.Find(268, 128, wet: false)!.Number);
-        Assert.Equal(19, catalog.Find(268, 128, wet: true)!.Number);
+        Assert.Equal(14, Assert.Single(catalog.Find(268, 128, wet: false)).Number);
+        Assert.Equal(19, Assert.Single(catalog.Find(268, 128, wet: true)).Number);
     }
 
     [Fact]
@@ -91,8 +91,8 @@ public class ChallengeCatalogTests
         // Challenges only count in a league session, where ARA sets the weather, so a lone
         // challenge for a track and car is the one being run whatever the sky is doing.
         var catalog = ChallengeCatalog.FromJson(TwoRows);
-        Assert.Equal(1, catalog.Find(299, 142, wet: true)!.Number);
-        Assert.Equal(1, catalog.Find(299, 142, wet: false)!.Number);
+        Assert.Equal(1, Assert.Single(catalog.Find(299, 142, wet: true)).Number);
+        Assert.Equal(1, Assert.Single(catalog.Find(299, 142, wet: false)).Number);
     }
 
     [Fact]
@@ -107,9 +107,55 @@ public class ChallengeCatalogTests
         """;
 
         var catalog = ChallengeCatalog.FromJson(spa);
-        Assert.Equal(11, catalog.Find(523, 128, wet: false)!.Number);
-        Assert.Equal(11, catalog.Find(163, 128, wet: false)!.Number);
-        Assert.Null(catalog.Find(268, 128, wet: false));
+        Assert.Equal(11, Assert.Single(catalog.Find(523, 128, wet: false)).Number);
+        Assert.Equal(11, Assert.Single(catalog.Find(163, 128, wet: false)).Number);
+        Assert.Empty(catalog.Find(268, 128, wet: false));
+    }
+
+    [Fact]
+    public void TwoPlansSharingATrackAndCarBothCount()
+    {
+        // ARA runs several series and they share circuits. Both are real challenges a driver
+        // could be attempting and no telemetry says which, so the lookup offers both.
+        const string twoPlans = """
+        [
+          { "number": 17, "plan": "ARA Challenges", "track": "Summit Point", "car": "MX-5",
+            "trackIds": [9], "carId": 67,
+            "gold": "1:30.600", "silver": "1:31.150", "bronze": "1:31.950" },
+          { "number": 3, "plan": "MX-5 Series", "track": "Summit Point", "car": "MX-5",
+            "trackIds": [9], "carId": 67,
+            "gold": "1:20.475", "silver": "1:20.750", "bronze": "1:21.500" }
+        ]
+        """;
+
+        var catalog = ChallengeCatalog.FromJson(twoPlans);
+
+        Assert.Equal([17, 3], catalog.Find(9, 67, wet: false).Select(c => c.Number));
+        Assert.Equal([17, 3], catalog.Find(9, 67, wet: true).Select(c => c.Number));
+    }
+
+    [Fact]
+    public void WetnessOnlyDecidesWithinOnePlan()
+    {
+        // The slower row is the wet one of its own plan, never another plan's challenge.
+        const string mixed = """
+        [
+          { "number": 14, "plan": "ARA Challenges", "track": "Le Mans", "car": "P217",
+            "trackIds": [268], "carId": 128,
+            "gold": "3:36.250", "silver": "3:37.000", "bronze": "3:38.800" },
+          { "number": 19, "plan": "ARA Challenges", "track": "Le Mans wet", "car": "P217",
+            "trackIds": [268], "carId": 128,
+            "gold": "4:10.200", "silver": "4:11.200", "bronze": "4:13.700" },
+          { "number": 12, "plan": "MX-5 Series", "track": "Le Mans", "car": "P217",
+            "trackIds": [268], "carId": 128,
+            "gold": "5:20.500", "silver": "5:23.000", "bronze": "5:28.500" }
+        ]
+        """;
+
+        var catalog = ChallengeCatalog.FromJson(mixed);
+
+        Assert.Equal([14, 12], catalog.Find(268, 128, wet: false).Select(c => c.Number));
+        Assert.Equal([19, 12], catalog.Find(268, 128, wet: true).Select(c => c.Number));
     }
 
     [Fact]
