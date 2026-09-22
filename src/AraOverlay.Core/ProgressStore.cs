@@ -9,29 +9,29 @@ public sealed record ChallengeProgress(double BestSeconds, Medal BestMedal);
 public sealed class ProgressStore
 {
     private readonly string _path;
-    private readonly Dictionary<int, ChallengeProgress> _progress;
+    private readonly Dictionary<string, ChallengeProgress> _progress;
 
     /// <summary>Loads the stored progress, or starts empty if there's no usable file.</summary>
     /// <param name="path">Where the JSON lives.</param>
     public ProgressStore(string path)
     {
         _path = path;
-        _progress = JsonFile.Load<Dictionary<int, ChallengeProgress>>(path) ?? new();
+        _progress = JsonFile.Load<Dictionary<string, ChallengeProgress>>(path) ?? new();
     }
 
     /// <summary>Reads one challenge's record.</summary>
-    /// <param name="challengeNumber">The challenge number, 1 to 20.</param>
+    /// <param name="key">The challenge's progress key.</param>
     /// <returns>The stored best, or null if nothing is recorded.</returns>
-    public ChallengeProgress? Get(int challengeNumber) => _progress.GetValueOrDefault(challengeNumber);
+    public ChallengeProgress? Get(string key) => _progress.GetValueOrDefault(key);
 
     /// <summary>Records a completed clean lap, saving if anything changed.</summary>
-    /// <param name="challengeNumber">The challenge the lap was set on.</param>
+    /// <param name="key">The challenge the lap was set on.</param>
     /// <param name="seconds">The lap time.</param>
     /// <param name="medal">The medal it earned.</param>
     /// <returns>True only if it beat the medal already held.</returns>
-    public bool RecordLap(int challengeNumber, double seconds, Medal medal)
+    public bool RecordLap(string key, double seconds, Medal medal)
     {
-        var previous = Get(challengeNumber);
+        var previous = Get(key);
         var heldMedal = previous?.BestMedal ?? Medal.None;
 
         var updated = new ChallengeProgress(
@@ -40,7 +40,7 @@ public sealed class ProgressStore
 
         if (updated != previous)
         {
-            _progress[challengeNumber] = updated;
+            _progress[key] = updated;
             Save();
         }
 
