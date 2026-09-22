@@ -75,7 +75,9 @@ public static class ApiCatalog
             return;
         }
 
-        if (PlatformId(item.TryGetProperty("trackInfo", out var trackInfo) ? trackInfo : default) is not { } trackId)
+        item.TryGetProperty("trackInfo", out var trackInfo);
+
+        if (PlatformId(trackInfo) is not { } trackId)
         {
             skipped.Add($"Challenge {name} has no iRacing track mapping.");
             return;
