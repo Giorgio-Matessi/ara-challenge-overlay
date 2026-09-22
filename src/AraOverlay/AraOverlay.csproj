@@ -34,6 +34,10 @@
 
   <ItemGroup>
     <PackageReference Include="IRSDKSharper" Version="1.1.9" />
+
+    <!-- DPAPI for the stored session token. MIT, so GPL-3 compatible. -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+
     <ProjectReference Include="..\AraOverlay.Core\AraOverlay.Core.csproj" />
   </ItemGroup>
 
