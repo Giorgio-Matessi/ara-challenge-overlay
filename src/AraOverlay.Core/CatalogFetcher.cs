@@ -66,7 +66,59 @@ public static class CatalogFetcher
             return CatalogFetch.Failed("The Academy could not be reached.");
         }
 
-        return new CatalogFetch(challenges, skipped, null);
+        return new CatalogFetch(Distinct(challenges, skipped), skipped, null);
+    }
+
+    /// <summary>
+    /// Drops challenges the lookup could not tell apart, reporting each one.
+    ///
+    /// A plan set holds regular and weekly challenges, and the same challenge can appear in more
+    /// than one plan; a second copy of a content id is that, not a second challenge. Beyond that,
+    /// two different challenges sharing a track, a car and their targets grade a lap identically,
+    /// so keeping the first is harmless where rejecting the whole catalog would not be.
+    /// </summary>
+    /// <param name="challenges">Everything read, in plan order.</param>
+    /// <param name="skipped">Where to record what was dropped and why.</param>
+    /// <returns>The challenges the catalog can index.</returns>
+    private static List<Challenge> Distinct(List<Challenge> challenges, List<string> skipped)
+    {
+        var kept = new List<Challenge>();
+        var seenContent = new HashSet<string>(StringComparer.Ordinal);
+        var byCombination = new Dictionary<(int Track, int Car), List<Challenge>>();
+
+        foreach (var challenge in challenges)
+        {
+            if (!seenContent.Add(challenge.ContentId))
+            {
+                skipped.Add($"Challenge {challenge.ContentId} appears in more than one plan; keeping the first.");
+                continue;
+            }
+
+            var twin = challenge.TrackIds
+                .Select(track => byCombination.GetValueOrDefault((track, challenge.CarId)))
+                .OfType<List<Challenge>>()
+                .SelectMany(sharing => sharing)
+                .FirstOrDefault(other => Math.Abs(other.BronzeSeconds - challenge.BronzeSeconds) < 0.001);
+
+            if (twin is not null)
+            {
+                skipped.Add(
+                    $"Challenges {twin.ContentId} and {challenge.ContentId} share track " +
+                    $"{challenge.TrackIds[0]}, car {challenge.CarId} and their targets; keeping the first.");
+                continue;
+            }
+
+            foreach (var track in challenge.TrackIds)
+            {
+                if (!byCombination.TryGetValue((track, challenge.CarId), out var sharing))
+                    byCombination[(track, challenge.CarId)] = sharing = [];
+                sharing.Add(challenge);
+            }
+
+            kept.Add(challenge);
+        }
+
+        return kept;
     }
 
     /// <summary>Lists every plan id, following pagination to the end.</summary>

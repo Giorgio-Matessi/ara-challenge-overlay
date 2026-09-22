@@ -38,17 +38,24 @@ public class CatalogFetcherTests
           "items": [{{string.Join(",", ids.Select(i => $"{{\"id\":\"{i}\",\"name\":\"Plan\"}}"))}}] }
         """;
 
+    /// <summary>One target-time content item.</summary>
+    private static string Content(
+        string contentId, int trackPlatformId,
+        double bronze = 108.5, double silver = 108, double gold = 107.5) =>
+        $$"""
+        { "id": "{{contentId}}", "type": "target_time", "track": 1, "cars": [8],
+          "targets": [ { "id": "bronze", "lapTime": {{bronze}} },
+                       { "id": "silver", "lapTime": {{silver}} },
+                       { "id": "gold",   "lapTime": {{gold}} } ],
+          "trackInfo": { "id": 1, "name": "T", "platform": "iracing", "platform_id": "{{trackPlatformId}}" },
+          "carInfos": [ { "id": 8, "name": "C", "platform": "iracing", "platform_id": "67" } ],
+          "result": null }
+        """;
+
     private static string Detail(string contentId, int trackPlatformId) =>
         $$"""
         { "trainingPlanId": "p", "team": "almeida-racing-academy", "mode": "plan",
-          "trainingPlan": { "id": "p", "content": [
-            { "id": "{{contentId}}", "type": "target_time", "track": 1, "cars": [8],
-              "targets": [ { "id": "bronze", "lapTime": 108.5 },
-                           { "id": "silver", "lapTime": 108 },
-                           { "id": "gold",   "lapTime": 107.5 } ],
-              "trackInfo": { "id": 1, "name": "T", "platform": "iracing", "platform_id": "{{trackPlatformId}}" },
-              "carInfos": [ { "id": 8, "name": "C", "platform": "iracing", "platform_id": "67" } ],
-              "result": null } ] } }
+          "trainingPlan": { "id": "p", "content": [{{Content(contentId, trackPlatformId)}}] } }
         """;
 
     private static Task<CatalogFetch> Fetch(Routes routes) =>
@@ -171,6 +178,67 @@ public class CatalogFetcherTests
 
         Assert.True(fetch.Usable);
         Assert.InRange(routes.Requested.Count(p => p.Contains("training-plans?")), 1, 3);
+    }
+
+    [Fact]
+    public async Task AChallengeInTwoPlansIsOneChallenge()
+    {
+        // A plan set holds regular and weekly challenges and the same one can appear in both.
+        var routes = new Routes
+        {
+            List = (HttpStatusCode.OK, Listing("regular", "weekly")),
+            Detail = (HttpStatusCode.OK, Detail("c1", 166)),
+        };
+
+        var fetch = await Fetch(routes);
+
+        Assert.True(fetch.Usable);
+        Assert.Equal("c1", Assert.Single(fetch.Challenges).ContentId);
+        Assert.Single(fetch.Skipped);
+    }
+
+    [Fact]
+    public async Task TwoChallengesGradingIdenticallyDoNotCostTheWholeCatalog()
+    {
+        // Same track, car and targets: matching either grades a lap the same, so keeping the
+        // first is harmless where rejecting everything would leave the driver with nothing.
+        var routes = new Routes
+        {
+            List = (HttpStatusCode.OK, Listing("plan-a")),
+            Detail = (HttpStatusCode.OK, $$"""
+                { "trainingPlanId": "p", "team": "t", "mode": "plan", "trainingPlan": { "id": "p", "content": [
+                  {{Content("c1", 166)}}, {{Content("c8", 166)}} ] } }
+                """),
+        };
+
+        var fetch = await Fetch(routes);
+
+        Assert.True(fetch.Usable);
+        Assert.Equal("c1", Assert.Single(fetch.Challenges).ContentId);
+        Assert.Contains(fetch.Skipped, s => s.Contains("c8"));
+    }
+
+    [Fact]
+    public async Task AWetAndDryPairIsStillKept()
+    {
+        // Le Mans: the same track and car, told apart by the wet one's targets being slower.
+        var routes = new Routes
+        {
+            List = (HttpStatusCode.OK, Listing("plan-a")),
+            Detail = (HttpStatusCode.OK, $$"""
+                { "trainingPlanId": "p", "team": "t", "mode": "plan", "trainingPlan": { "id": "p", "content": [
+                  {{Content("dry", 268)}}, {{Content("wet", 268, bronze: 253.7, silver: 251.2, gold: 250.2)}} ] } }
+                """),
+        };
+
+        var fetch = await Fetch(routes);
+
+        Assert.Equal(2, fetch.Challenges.Count);
+        Assert.Empty(fetch.Skipped);
+
+        var catalog = ChallengeCatalog.FromChallenges(fetch.Challenges);
+        Assert.Equal("dry", catalog.Find(268, 67, wet: false)!.ContentId);
+        Assert.Equal("wet", catalog.Find(268, 67, wet: true)!.ContentId);
     }
 
     [Fact]
