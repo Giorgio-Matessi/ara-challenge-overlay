@@ -54,16 +54,18 @@ public sealed class ChallengeCatalog
     /// <exception cref="InvalidDataException">More than two, or two with the same targets.</exception>
     private static void Ambiguous((int Track, int Car) key, List<Challenge> sharing)
     {
-        var numbers = string.Join(" and ", sharing.Select(c => c.Number));
+        // Named by key as well as number: a catalog from the API is numbered by position, so two
+        // rows can both be "challenge 1" and the number alone wouldn't find them.
+        var named = string.Join(" and ", sharing.Select(c => $"{c.Number} ({c.Key})"));
 
         if (sharing.Count > 2)
             throw new InvalidDataException(
-                $"Challenges {numbers} all use track {key.Track} with car {key.Car}. Wet and dry " +
+                $"Challenges {named} all use track {key.Track} with car {key.Car}. Wet and dry " +
                 "is the only split the overlay can resolve.");
 
         if (sharing.Count == 2 && Math.Abs(sharing[0].BronzeSeconds - sharing[1].BronzeSeconds) < 0.001)
             throw new InvalidDataException(
-                $"Challenges {numbers} use track {key.Track} with car {key.Car} and the same " +
+                $"Challenges {named} use track {key.Track} with car {key.Car} and the same " +
                 "targets. Nothing tells them apart.");
     }
 
