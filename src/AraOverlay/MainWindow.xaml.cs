@@ -54,6 +54,7 @@ public partial class MainWindow : Window
     private Forms.ToolStripMenuItem? _lockItem;
     private Forms.ToolStripMenuItem? _signInItem;
     private Forms.ToolStripMenuItem? _copyCodeItem;
+    private Forms.ToolStripMenuItem? _matchItem;
     private CancellationTokenSource? _loginCancel;
     private LoginStatus _loginStatus = LoginStatus.Idle;
     private DateTimeOffset _loginSettled;
@@ -192,6 +193,11 @@ public partial class MainWindow : Window
         menu.Items.Add(_signInItem);
         menu.Items.Add(_copyCodeItem);
         menu.Items.Add(new Forms.ToolStripMenuItem("Check for updates now", null, (_, _) => RefreshCatalog()));
+
+        // Shown only where more than one plan uses this track and car, which the sim cannot
+        // resolve: both are real challenges and only the driver knows which they are running.
+        _matchItem = new Forms.ToolStripMenuItem("Challenge") { Visible = false };
+        menu.Items.Add(_matchItem);
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add(_lockItem);
         menu.Items.Add(new Forms.ToolStripSeparator());
@@ -308,6 +314,8 @@ public partial class MainWindow : Window
         }
 
         if (!_sdk.Connected) return;
+
+        UpdateMatchItem();
 
         if (_sdk.Challenge is { } challenge)
         {
@@ -581,7 +589,9 @@ public partial class MainWindow : Window
     /// <param name="held">Which medals to treat as held; defaults to the stored progress.</param>
     private void ShowChallenge(Challenge challenge, Medal? held = null)
     {
-        TitleText.Text = $"CHALLENGE {challenge.Number}{(_sdk.IsWet ? "  ·  WET" : "")}";
+        TitleText.Text = challenge.Plan.Length > 0
+            ? $"{challenge.Plan.ToUpperInvariant()}  ·  {challenge.Number}{(_sdk.IsWet ? "  ·  WET" : "")}"
+            : $"CHALLENGE {challenge.Number}{(_sdk.IsWet ? "  ·  WET" : "")}";
         TrackText.Text = challenge.Track.ToUpperInvariant();
         CarText.Text = challenge.Car.ToUpperInvariant();
 
@@ -592,6 +602,34 @@ public partial class MainWindow : Window
         BronzeTime.Text = TimeFormat.Format(challenge.BronzeSeconds);
 
         UpdateLiveRows(challenge, held ?? HeldMedal(challenge));
+    }
+
+    /// <summary>
+    /// Rebuilds the tray's challenge picker. It appears only when this track and car belong to
+    /// more than one plan, which is the one case the overlay cannot decide on its own.
+    /// </summary>
+    private void UpdateMatchItem()
+    {
+        if (_matchItem is null) return;
+
+        _matchItem.Visible = _sdk.Matches.Count > 1;
+        _matchItem.DropDownItems.Clear();
+
+        if (!_matchItem.Visible) return;
+
+        for (var i = 0; i < _sdk.Matches.Count; i++)
+        {
+            var match = _sdk.Matches[i];
+            var index = i;
+
+            _matchItem.DropDownItems.Add(new Forms.ToolStripMenuItem(
+                match.Plan.Length > 0 ? $"{match.Plan} — {match.Number}" : $"Challenge {match.Number}",
+                null,
+                (_, _) => _sdk.SelectMatch(index))
+            {
+                Checked = ReferenceEquals(match, _sdk.Challenge),
+            });
+        }
     }
 
     /// <summary>Reads the best medal stored against a challenge.</summary>

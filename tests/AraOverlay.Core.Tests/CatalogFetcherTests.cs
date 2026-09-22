@@ -237,8 +237,8 @@ public class CatalogFetcherTests
         Assert.Empty(fetch.Skipped);
 
         var catalog = ChallengeCatalog.FromChallenges(fetch.Challenges);
-        Assert.Equal("dry", catalog.Find(268, 67, wet: false)!.ContentId);
-        Assert.Equal("wet", catalog.Find(268, 67, wet: true)!.ContentId);
+        Assert.Equal("dry", Assert.Single(catalog.Find(268, 67, wet: false)).ContentId);
+        Assert.Equal("wet", Assert.Single(catalog.Find(268, 67, wet: true)).ContentId);
     }
 
     [Fact]
@@ -248,6 +248,6 @@ public class CatalogFetcherTests
 
         var catalog = ChallengeCatalog.FromChallenges((await Fetch(routes)).Challenges);
 
-        Assert.Equal("c1", catalog.Find(166, 67, wet: false)!.ContentId);
+        Assert.Equal("c1", Assert.Single(catalog.Find(166, 67, wet: false)).ContentId);
     }
 }

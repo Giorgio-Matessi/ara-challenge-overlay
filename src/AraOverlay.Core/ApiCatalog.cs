@@ -24,8 +24,8 @@ public static class ApiCatalog
     {
         using var document = Parse(json);
 
-        if (!document.RootElement.TryGetProperty("trainingPlan", out var plan) ||
-            !plan.TryGetProperty("content", out var content) ||
+        if (!document.RootElement.TryGetProperty("trainingPlan", out var trainingPlan) ||
+            !trainingPlan.TryGetProperty("content", out var content) ||
             content.ValueKind != JsonValueKind.Array)
             throw new InvalidDataException("The response did not contain a training plan.");
 
@@ -33,11 +33,15 @@ public static class ApiCatalog
         var skipped = new List<string>();
         var ordinal = 0;
 
+        // ARA runs several plans and each numbers its own challenges from one, so the name is
+        // what tells "challenge 3" of one series from "challenge 3" of another.
+        var plan = Text(trainingPlan, "name") ?? "";
+
         foreach (var item in content.EnumerateArray())
         {
             if (Text(item, "type") != "target_time") continue;
             ordinal++;
-            Read(item, ordinal, challenges, skipped);
+            Read(item, plan, ordinal, challenges, skipped);
         }
 
         return new ApiCatalogResult(challenges, skipped);
@@ -61,10 +65,11 @@ public static class ApiCatalog
 
     /// <summary>Reads one target-time item, adding a challenge per car or a reason it was skipped.</summary>
     /// <param name="item">The content item.</param>
+    /// <param name="plan">The plan's name, which scopes the challenge's number.</param>
     /// <param name="ordinal">Its place among the target-time items, used when position is absent.</param>
     /// <param name="challenges">Where to add what was read.</param>
     /// <param name="skipped">Where to add why it wasn't.</param>
-    private static void Read(JsonElement item, int ordinal, List<Challenge> challenges, List<string> skipped)
+    private static void Read(JsonElement item, string plan, int ordinal, List<Challenge> challenges, List<string> skipped)
     {
         var contentId = Text(item, "id") ?? "";
         var name = contentId.Length > 0 ? contentId : $"item {ordinal}";
@@ -103,6 +108,7 @@ public static class ApiCatalog
         {
             Number = number,
             ContentId = contentId,
+            Plan = plan,
             Track = Text(trackInfo, "name") ?? "",
             Car = car.Name,
             TrackIds = [trackId],

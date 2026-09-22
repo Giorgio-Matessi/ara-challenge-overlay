@@ -240,8 +240,8 @@ public class ApiCatalogTests
         // The whole point: what comes off the API has to match the same way the embedded rows do.
         var catalog = ChallengeCatalog.FromChallenges(Read(Item()).Challenges);
 
-        Assert.Equal(7, catalog.Find(166, 67, wet: false)!.Number);
-        Assert.Null(catalog.Find(166, 999, wet: false));
+        Assert.Equal(7, Assert.Single(catalog.Find(166, 67, wet: false)).Number);
+        Assert.Empty(catalog.Find(166, 999, wet: false));
     }
 
     [Theory]
