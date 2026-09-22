@@ -55,6 +55,7 @@ public partial class MainWindow : Window
     private Forms.ToolStripMenuItem? _copyCodeItem;
     private CancellationTokenSource? _loginCancel;
     private LoginStatus _loginStatus = LoginStatus.Idle;
+    private DateTimeOffset _loginSettled;
     private IntPtr _hwnd;
     private bool _hotkeyClaimed;
     private double? _lastLap;
@@ -69,7 +70,7 @@ public partial class MainWindow : Window
         Top = _settings.Top;
 
         _bannerTimer.Tick += (_, _) => HideBanner();
-        _loginTimer.Tick += (_, _) => ShowLogin();
+        _loginTimer.Tick += (_, _) => OnLoginTick();
 
         _sdk.StateChanged += () => Dispatcher.InvokeAsync(RenderState);
         _sdk.Tick += live => Dispatcher.InvokeAsync(() => OnTick(live));
@@ -194,6 +195,9 @@ public partial class MainWindow : Window
         };
     }
 
+    /// <summary>How long a finished login's message stays up before the panel moves on.</summary>
+    private static readonly TimeSpan SettledMessageFor = TimeSpan.FromSeconds(10);
+
     private static readonly Medal[] DemoTiers = [Medal.None, Medal.Bronze, Medal.Silver, Medal.Gold];
 
     /// <summary>Invents a lap time for the demo.</summary>
@@ -215,6 +219,10 @@ public partial class MainWindow : Window
         var demo = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
         demo.Tick += (_, _) =>
         {
+            // The cycle would otherwise redraw the panel over a login every 2.5 seconds, leaving
+            // the code flashing between challenge tiles for as long as it took to read it.
+            if (SigningIn || _loginStatus.Message.Length > 0) return;
+
             if (step < 0)
             {
                 step++;
@@ -375,8 +383,12 @@ public partial class MainWindow : Window
     {
         _loginStatus = status;
 
-        if (status.State == LoginState.WaitingForBrowser) _loginTimer.Start();
-        else _loginTimer.Stop();
+        // A finished login only lingers if it has something to say; a successful one says nothing
+        // and the panel goes straight back to the challenge.
+        _loginSettled = status.State == LoginState.Failed ? DateTimeOffset.UtcNow : default;
+
+        _loginTimer.Stop();
+        if (SigningIn || status.Message.Length > 0) _loginTimer.Start();
 
         if (_copyCodeItem is not null) _copyCodeItem.Visible = status.UserCode.Length > 0;
 
@@ -407,6 +419,24 @@ public partial class MainWindow : Window
         _signInItem.Text = SigningIn ? "Cancel sign-in"
             : TokenStore.Load() is { Usable: true } ? "Sign out"
             : "Sign in…";
+    }
+
+    /// <summary>
+    /// Runs the login panel's clock: the countdown while waiting, then clearing a finished
+    /// login so the panel goes back to the challenge rather than sitting on the message.
+    /// </summary>
+    private void OnLoginTick()
+    {
+        if (_loginSettled != default && DateTimeOffset.UtcNow - _loginSettled > SettledMessageFor)
+        {
+            _loginStatus = LoginStatus.Idle;
+            _loginSettled = default;
+            _loginTimer.Stop();
+            RenderState();
+            return;
+        }
+
+        ShowLogin();
     }
 
     /// <summary>Fills the login rows, including the countdown, which ticks once a second.</summary>
