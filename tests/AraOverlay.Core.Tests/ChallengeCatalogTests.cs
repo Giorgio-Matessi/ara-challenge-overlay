@@ -34,8 +34,10 @@ public class ChallengeCatalogTests
     }
 
     [Fact]
-    public void FromJson_RejectsDuplicatesWithTheSameConditions()
+    public void FromJson_RejectsTwoChallengesItCannotTellApart()
     {
+        // Same track and car, same times: nothing distinguishes them, so the overlay would be
+        // guessing which one the driver is running.
         const string duplicated = """
         [
           { "number": 1, "track": "A", "car": "X", "trackIds": [1], "carId": 2,
@@ -48,15 +50,32 @@ public class ChallengeCatalogTests
     }
 
     [Fact]
-    public void WetAndDryVersionsOfTheSameCombinationAreDistinct()
+    public void FromJson_RejectsThreeChallengesOnTheSameCombination()
     {
-        // This is challenges 14 and 19: the same car, on the same Le Mans layout.
+        // Wet and dry is the only split the overlay can resolve; a third would be a new rule.
+        const string three = """
+        [
+          { "number": 1, "track": "A", "car": "X", "trackIds": [1], "carId": 2,
+            "gold": "1:00.000", "silver": "1:01.000", "bronze": "1:02.000" },
+          { "number": 2, "track": "A", "car": "X", "trackIds": [1], "carId": 2,
+            "gold": "2:00.000", "silver": "2:01.000", "bronze": "2:02.000" },
+          { "number": 3, "track": "A", "car": "X", "trackIds": [1], "carId": 2,
+            "gold": "3:00.000", "silver": "3:01.000", "bronze": "3:02.000" }
+        ]
+        """;
+        Assert.Throws<InvalidDataException>(() => { ChallengeCatalog.FromJson(three); });
+    }
+
+    [Fact]
+    public void WetAndDryVersionsOfTheSameCombinationAreToldApartByTheirTargets()
+    {
+        // This is challenges 14 and 19: the same car, on the same Le Mans layout. Nothing in the
+        // data says which is wet — the wet one is 34 seconds slower, and that's the whole signal.
         const string lemans = """
         [
           { "number": 14, "track": "Le Mans dry", "car": "X", "trackIds": [268], "carId": 128,
             "gold": "3:36.250", "silver": "3:37.000", "bronze": "3:38.800" },
           { "number": 19, "track": "Le Mans wet", "car": "X", "trackIds": [268], "carId": 128,
-            "wet": true,
             "gold": "4:10.200", "silver": "4:11.200", "bronze": "4:13.700" }
         ]
         """;
@@ -67,10 +86,13 @@ public class ChallengeCatalogTests
     }
 
     [Fact]
-    public void ADryChallengeDoesNotMatchInTheWet()
+    public void TheOnlyChallengeForACombinationMatchesInAnyWeather()
     {
-        // Otherwise the wet targets would be handed out in the dry, where they're trivial.
-        Assert.Null(ChallengeCatalog.FromJson(TwoRows).Find(299, 142, wet: true));
+        // Challenges only count in a league session, where ARA sets the weather, so a lone
+        // challenge for a track and car is the one being run whatever the sky is doing.
+        var catalog = ChallengeCatalog.FromJson(TwoRows);
+        Assert.Equal(1, catalog.Find(299, 142, wet: true)!.Number);
+        Assert.Equal(1, catalog.Find(299, 142, wet: false)!.Number);
     }
 
     [Fact]
@@ -137,10 +159,27 @@ public class ChallengeCatalogTests
     }
 
     [Fact]
-    public void Embedded_MarksChallenges16To20AsWet()
+    public void Embedded_NeedsTheWeatherForLeMansAndNothingElse()
     {
-        foreach (var c in ChallengeCatalog.Embedded.Challenges)
-            Assert.Equal(c.Number >= 16, c.Wet);
+        // Every other challenge is alone on its track and car, so wetness never decides it. If a
+        // second combination ever doubles up, the wet/dry split has to be checked by hand.
+        var doubled = ChallengeCatalog.Embedded.Challenges
+            .SelectMany(c => c.TrackIds.Select(t => (Track: t, c.CarId)))
+            .GroupBy(k => k)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
+
+        Assert.Equal([(268, 128)], doubled);
+    }
+
+    [Fact]
+    public void Embedded_GivesEveryChallengeAProgressKey()
+    {
+        var keys = ChallengeCatalog.Embedded.Challenges.Select(c => c.Key).ToList();
+
+        Assert.Equal(keys.Count, keys.Distinct().Count());
+        Assert.All(keys, k => Assert.StartsWith("local:", k));
     }
 
     [Fact]
