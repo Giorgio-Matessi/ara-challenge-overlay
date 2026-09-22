@@ -80,6 +80,12 @@ public sealed class ChallengeCatalog
         return new ChallengeCatalog(challenges);
     }
 
+    /// <summary>Builds a catalog from rows already read, as the API path produces them.</summary>
+    /// <param name="challenges">The challenges to index.</param>
+    /// <returns>The catalog.</returns>
+    /// <exception cref="InvalidDataException">A row is unusable, or a combination is ambiguous.</exception>
+    public static ChallengeCatalog FromChallenges(IReadOnlyList<Challenge> challenges) => new(challenges);
+
     /// <summary>Matches a live session to a challenge, using wetness only to break a tie.</summary>
     /// <param name="trackId">WeekendInfo:TrackID.</param>
     /// <param name="carId">The player's DriverInfo:Drivers:CarID.</param>
