@@ -55,10 +55,10 @@
     <Grid x:Name="Root">
 
         <!-- Shown until iRacing is running. The image is 1000x600, so it needs an explicit
-             width or it sizes the whole window: 340 is the panel's own content width. -->
+             width or it sizes the whole window: 380 is the panel's own content width. -->
         <Image x:Name="Waiting"
                Source="/assets/waiting-banner.png"
-               Width="340"
+               Width="380"
                MouseLeftButtonDown="OnPanelDrag"/>
 
         <!-- Standing panel. UniformToFill crops the art's own rounded corners away, so the
@@ -77,7 +77,7 @@
             </Border.Background>
             <!-- Fixed, not Min/Max: the header's track and car sit in star columns, which still
                  report their text width, so long names grew the panel. Names ellipsize instead. -->
-            <StackPanel Width="340">
+            <StackPanel Width="380">
 
                 <!-- Challenge | track | car -->
                 <Border Style="{StaticResource Row}" Padding="0,0,0,6">
