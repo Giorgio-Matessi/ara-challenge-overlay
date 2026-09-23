@@ -26,53 +26,62 @@ public sealed class ChallengeCatalog
         AllowTrailingCommas = true,
     };
 
-    private readonly Dictionary<(int Track, int Car), List<Challenge>> _byCombination;
+    private readonly Dictionary<(int Track, int Car), List<Challenge>> _byCombination = new();
 
     public IReadOnlyList<Challenge> Challenges { get; }
 
-    /// <summary>Validates and indexes the rows, once per track id.</summary>
+    /// <summary>A line per challenge dropped for grading identically to one kept.</summary>
+    public IReadOnlyList<string> Skipped { get; }
+
+    /// <summary>
+    /// Validates and indexes the rows, once per track id. Two challenges in one plan sharing a
+    /// track, a car and their targets grade a lap identically, so the first is kept and the second
+    /// reported rather than costing the whole catalog.
+    /// </summary>
     /// <param name="challenges">The challenge list.</param>
-    /// <exception cref="InvalidDataException">A row is unusable, or a combination is ambiguous.</exception>
-    private ChallengeCatalog(IReadOnlyList<Challenge> challenges)
+    /// <exception cref="InvalidDataException">A row is unusable, or a plan has three on one combination.</exception>
+    public ChallengeCatalog(IReadOnlyList<Challenge> challenges)
     {
-        Challenges = challenges;
-        _byCombination = new Dictionary<(int, int), List<Challenge>>();
+        var kept = new List<Challenge>();
+        var skipped = new List<string>();
 
         foreach (var challenge in challenges)
         {
             challenge.Validate();
+
+            var twin = challenge.TrackIds
+                .SelectMany(track => _byCombination.GetValueOrDefault((track, challenge.CarId)) ?? [])
+                .FirstOrDefault(other =>
+                    string.Equals(other.Plan, challenge.Plan, StringComparison.Ordinal) &&
+                    Math.Abs(other.BronzeSeconds - challenge.BronzeSeconds) < 0.001);
+
+            if (twin is not null)
+            {
+                skipped.Add(
+                    $"Challenges {twin.Number} ({twin.Key}) and {challenge.Number} ({challenge.Key}) share track " +
+                    $"{challenge.TrackIds[0]}, car {challenge.CarId} and their targets; keeping the first.");
+                continue;
+            }
+
             foreach (var trackId in challenge.TrackIds)
             {
                 if (!_byCombination.TryGetValue((trackId, challenge.CarId), out var sharing))
                     _byCombination[(trackId, challenge.CarId)] = sharing = [];
                 sharing.Add(challenge);
             }
+
+            kept.Add(challenge);
         }
 
         foreach (var (key, sharing) in _byCombination)
-            foreach (var plan in sharing.GroupBy(c => c.Plan, StringComparer.Ordinal))
-                Ambiguous(key, [.. plan]);
-    }
+            foreach (var plan in sharing.GroupBy(c => c.Plan, StringComparer.Ordinal).Where(p => p.Count() > 2))
+                throw new InvalidDataException(
+                    $"Challenges {string.Join(" and ", plan.Select(c => $"{c.Number} ({c.Key})"))} all use " +
+                    $"track {key.Track} with car {key.Car} in the same plan. Wet and dry is the only split " +
+                    "the overlay can resolve.");
 
-    /// <summary>Rejects a combination the overlay could not resolve from a live session.</summary>
-    /// <param name="key">The track and car they share.</param>
-    /// <param name="sharing">The challenges filed under it.</param>
-    /// <exception cref="InvalidDataException">More than two, or two with the same targets.</exception>
-    private static void Ambiguous((int Track, int Car) key, List<Challenge> sharing)
-    {
-        // Named by key as well as number: a catalog from the API is numbered by position, so two
-        // rows can both be "challenge 1" and the number alone wouldn't find them.
-        var named = string.Join(" and ", sharing.Select(c => $"{c.Number} ({c.Key})"));
-
-        if (sharing.Count > 2)
-            throw new InvalidDataException(
-                $"Challenges {named} all use track {key.Track} with car {key.Car} in the same " +
-                "plan. Wet and dry is the only split the overlay can resolve.");
-
-        if (sharing.Count == 2 && Math.Abs(sharing[0].BronzeSeconds - sharing[1].BronzeSeconds) < 0.001)
-            throw new InvalidDataException(
-                $"Challenges {named} use track {key.Track} with car {key.Car} and the same " +
-                "targets. Nothing tells them apart.");
+        Challenges = kept;
+        Skipped = skipped;
     }
 
     public static ChallengeCatalog Embedded { get; } = LoadEmbedded();
@@ -87,12 +96,6 @@ public sealed class ChallengeCatalog
             ?? throw new InvalidDataException("challenges.json did not contain a list.");
         return new ChallengeCatalog(challenges);
     }
-
-    /// <summary>Builds a catalog from rows already read, as the API path produces them.</summary>
-    /// <param name="challenges">The challenges to index.</param>
-    /// <returns>The catalog.</returns>
-    /// <exception cref="InvalidDataException">A row is unusable, or a combination is ambiguous.</exception>
-    public static ChallengeCatalog FromChallenges(IReadOnlyList<Challenge> challenges) => new(challenges);
 
     /// <summary>
     /// Matches a live session, returning one candidate per plan. Wetness picks between a plan's

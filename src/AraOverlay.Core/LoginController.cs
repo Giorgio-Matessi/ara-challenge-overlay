@@ -189,9 +189,9 @@ public sealed class LoginController(
     {
         var root = Root(body);
 
-        return Text(root, "transaction_id") is { } id &&
-               Text(root, "user_code") is { } userCode &&
-               Text(root, "verification_uri") is { } uri &&
+        return ApiCatalog.Text(root, "transaction_id") is { } id &&
+               ApiCatalog.Text(root, "user_code") is { } userCode &&
+               ApiCatalog.Text(root, "verification_uri") is { } uri &&
                Uri.TryCreate(uri, UriKind.Absolute, out var parsed) &&
                parsed.Scheme == Uri.UriSchemeHttps
             ? (id, userCode, uri, Number(root, "expires_in", 600), Number(root, "interval", 5))
@@ -206,7 +206,7 @@ public sealed class LoginController(
         var root = Root(body);
 
         // expires_in is read rather than assumed, so a server-side change needs no new build.
-        return Text(root, "access_token") is { Length: > 0 } token
+        return ApiCatalog.Text(root, "access_token") is { Length: > 0 } token
             ? new LoginResult(token, DateTimeOffset.UtcNow.AddSeconds(Number(root, "expires_in", 43200)))
             : null;
     }
@@ -225,14 +225,6 @@ public sealed class LoginController(
             return default;
         }
     }
-
-    /// <summary>Reads a string property.</summary>
-    private static string? Text(JsonElement element, string name) =>
-        element.ValueKind == JsonValueKind.Object &&
-        element.TryGetProperty(name, out var value) &&
-        value.ValueKind == JsonValueKind.String
-            ? value.GetString()
-            : null;
 
     /// <summary>Reads an integer property.</summary>
     private static int Number(JsonElement element, string name, int fallback) =>

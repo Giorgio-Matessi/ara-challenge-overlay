@@ -219,12 +219,6 @@ public partial class MainWindow : Window
 
     private static readonly Medal[] DemoTiers = [Medal.None, Medal.Bronze, Medal.Silver, Medal.Gold];
 
-    /// <summary>Invents a lap time for the demo.</summary>
-    /// <param name="challenge">The challenge being shown.</param>
-    /// <param name="medal">The tier the lap should earn.</param>
-    /// <returns>A time just inside that tier's threshold.</returns>
-    private static double DemoLap(Challenge challenge, Medal medal) => challenge.TargetFor(medal) - 0.05;
-
     /// <summary>Cycles every challenge and medal state with no sim attached, for --demo.</summary>
     private void StartDemo()
     {
@@ -253,7 +247,7 @@ public partial class MainWindow : Window
             var index = step / 2 % challenges.Count;
             var challenge = challenges[index];
             var medal = DemoTiers[index % DemoTiers.Length];
-            var lap = medal == Medal.None ? challenge.BronzeSeconds + 1.234 : DemoLap(challenge, medal);
+            var lap = medal == Medal.None ? challenge.BronzeSeconds + 1.234 : challenge.TargetFor(medal) - 0.05;
 
             if (step % 2 == 0)
             {
@@ -393,7 +387,7 @@ public partial class MainWindow : Window
             {
                 // Anything the fetcher didn't expect. Losing the flag here would stop every later
                 // refresh for the rest of the session, silently.
-                await Dispatcher.InvokeAsync(() => { _refreshing = false; Log($"{e.GetType().Name}: {e.Message}"); });
+                await Dispatcher.InvokeAsync(() => { _refreshing = false; SdkService.Log($"{e.GetType().Name}: {e.Message}"); });
                 return;
             }
 
@@ -401,11 +395,11 @@ public partial class MainWindow : Window
             {
                 _refreshing = false;
 
-                if (fetched.Skipped.Count > 0) Log(string.Join(Environment.NewLine, fetched.Skipped));
+                if (fetched.Skipped.Count > 0) SdkService.Log(string.Join(Environment.NewLine, fetched.Skipped));
 
                 if (!fetched.Usable)
                 {
-                    if (fetched.Error is { } error) Log(error);
+                    if (fetched.Error is { } error) SdkService.Log(error);
                     return;
                 }
 
@@ -413,7 +407,8 @@ public partial class MainWindow : Window
                 {
                     // Built before it is cached: a catalog the lookup rejects must not replace a
                     // good file on disk.
-                    var catalog = ChallengeCatalog.FromChallenges(fetched.Challenges);
+                    var catalog = new ChallengeCatalog(fetched.Challenges);
+                    if (catalog.Skipped.Count > 0) SdkService.Log(string.Join(Environment.NewLine, catalog.Skipped));
 
                     CatalogCache.Save(fetched.Challenges);
                     _sdk.SwapCatalog(catalog);
@@ -422,25 +417,10 @@ public partial class MainWindow : Window
                 {
                     // Two challenges the overlay could not tell apart. Keeping the old catalog is
                     // the only safe answer; the log is how this gets reported to ARA.
-                    Log(e.Message);
+                    SdkService.Log(e.Message);
                 }
             });
         });
-    }
-
-    /// <summary>Appends a line to %APPDATA%\AraOverlay\errors.log, the same file the SDK uses.</summary>
-    /// <param name="message">What to record.</param>
-    private static void Log(string message)
-    {
-        try
-        {
-            var path = JsonFile.PathIn("errors.log");
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            File.AppendAllText(path, $"{DateTime.Now:s}  {message}{Environment.NewLine}");
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-        }
     }
 
     /// <summary>Revokes the session with the server, then forgets it locally either way.</summary>

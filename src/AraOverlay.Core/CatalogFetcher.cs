@@ -41,11 +41,12 @@ public static class CatalogFetcher
     {
         var challenges = new List<Challenge>();
         var skipped = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
 
         try
         {
             if (await PlanIds(api, token, cancel).ConfigureAwait(false) is not { } plans)
-                return CatalogFetch.Failed(await Status(api, token, cancel).ConfigureAwait(false));
+                return CatalogFetch.Failed(Describe((await api.GetSession(token, cancel).ConfigureAwait(false)).Status));
 
             foreach (var planId in plans)
             {
@@ -53,8 +54,13 @@ public static class CatalogFetcher
                 if (!response.Ok) return CatalogFetch.Failed(Describe(response.Status));
 
                 var read = ApiCatalog.FromPlanDetail(response.Body);
-                challenges.AddRange(read.Challenges);
                 skipped.AddRange(read.Skipped);
+
+                // A plan set holds regular and weekly challenges, and the same one can appear in
+                // more than one plan; a second copy of a content id is that, not a second challenge.
+                foreach (var challenge in read.Challenges)
+                    if (seen.Add(challenge.ContentId)) challenges.Add(challenge);
+                    else skipped.Add($"Challenge {challenge.ContentId} appears in more than one plan; keeping the first.");
             }
         }
         catch (Exception e) when (e is InvalidDataException or JsonException)
@@ -66,64 +72,7 @@ public static class CatalogFetcher
             return CatalogFetch.Failed("The Academy could not be reached.");
         }
 
-        return new CatalogFetch(Distinct(challenges, skipped), skipped, null);
-    }
-
-    /// <summary>
-    /// Drops challenges the lookup could not tell apart, reporting each one.
-    ///
-    /// A plan set holds regular and weekly challenges, and the same challenge can appear in more
-    /// than one plan; a second copy of a content id is that, not a second challenge. Beyond that,
-    /// two different challenges sharing a track, a car and their targets grade a lap identically,
-    /// so keeping the first is harmless where rejecting the whole catalog would not be.
-    /// </summary>
-    /// <param name="challenges">Everything read, in plan order.</param>
-    /// <param name="skipped">Where to record what was dropped and why.</param>
-    /// <returns>The challenges the catalog can index.</returns>
-    private static List<Challenge> Distinct(List<Challenge> challenges, List<string> skipped)
-    {
-        var kept = new List<Challenge>();
-        var seenContent = new HashSet<string>(StringComparer.Ordinal);
-        var byCombination = new Dictionary<(int Track, int Car), List<Challenge>>();
-
-        foreach (var challenge in challenges)
-        {
-            if (!seenContent.Add(challenge.ContentId))
-            {
-                skipped.Add($"Challenge {challenge.ContentId} appears in more than one plan; keeping the first.");
-                continue;
-            }
-
-            // Only within the same plan. Two plans using the same circuit and car are two real
-            // challenges a driver could be attempting, and the lookup offers both rather than
-            // picking one on their behalf.
-            var twin = challenge.TrackIds
-                .Select(track => byCombination.GetValueOrDefault((track, challenge.CarId)))
-                .OfType<List<Challenge>>()
-                .SelectMany(sharing => sharing)
-                .FirstOrDefault(other =>
-                    string.Equals(other.Plan, challenge.Plan, StringComparison.Ordinal) &&
-                    Math.Abs(other.BronzeSeconds - challenge.BronzeSeconds) < 0.001);
-
-            if (twin is not null)
-            {
-                skipped.Add(
-                    $"Challenges {twin.ContentId} and {challenge.ContentId} share track " +
-                    $"{challenge.TrackIds[0]}, car {challenge.CarId} and their targets; keeping the first.");
-                continue;
-            }
-
-            foreach (var track in challenge.TrackIds)
-            {
-                if (!byCombination.TryGetValue((track, challenge.CarId), out var sharing))
-                    byCombination[(track, challenge.CarId)] = sharing = [];
-                sharing.Add(challenge);
-            }
-
-            kept.Add(challenge);
-        }
-
-        return kept;
+        return new CatalogFetch(challenges, skipped, null);
     }
 
     /// <summary>Lists every plan id, following pagination to the end.</summary>
@@ -169,17 +118,6 @@ public static class CatalogFetcher
         }
 
         return ids;
-    }
-
-    /// <summary>Asks why a listing failed, so the member is told the actual reason.</summary>
-    /// <param name="api">The Labs client.</param>
-    /// <param name="token">The ARA bearer token.</param>
-    /// <param name="cancel">Cancels the request.</param>
-    /// <returns>A line for the panel.</returns>
-    private static async Task<string> Status(ApiClient api, string token, CancellationToken cancel)
-    {
-        var session = await api.GetSession(token, cancel).ConfigureAwait(false);
-        return Describe(session.Status);
     }
 
     /// <summary>Turns a status into something worth showing a driver.</summary>

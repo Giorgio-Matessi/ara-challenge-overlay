@@ -207,7 +207,7 @@ public static class ApiCatalog
     /// <param name="element">The object to read from.</param>
     /// <param name="name">The property name.</param>
     /// <returns>Its value, or null if absent or not a string.</returns>
-    private static string? Text(JsonElement element, string name) =>
+    internal static string? Text(JsonElement element, string name) =>
         element.ValueKind == JsonValueKind.Object &&
         element.TryGetProperty(name, out var value) &&
         value.ValueKind == JsonValueKind.String
