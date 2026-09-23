@@ -22,7 +22,7 @@ public sealed class SdkService : IDisposable
     private readonly IRacingSdk _sdk = new();
     private readonly LapTracker _tracker = new();
     private readonly ConditionTracker _conditions = new();
-    private ChallengeCatalog _catalog = ChallengeCatalog.Embedded;
+    private ChallengeCatalog _catalog = new([]);
     private ChallengeCatalog? _staged;
 
     private static readonly TimeSpan RestartDelay = TimeSpan.FromSeconds(2);
@@ -37,6 +37,7 @@ public sealed class SdkService : IDisposable
     public string TrackName { get; private set; } = "";
     public string CarName { get; private set; } = "";
     public bool IsWet => _conditions.IsWet;
+    public bool HasChallenges => _catalog.Challenges.Count > 0;
     public double? SessionBest => _tracker.SessionBestSeconds;
     /// <summary>Every challenge this track and car could be, one per plan.</summary>
     public IReadOnlyList<Challenge> Matches { get; private set; } = [];

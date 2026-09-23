@@ -55,10 +55,10 @@
     <Grid x:Name="Root">
 
         <!-- Shown until iRacing is running. The image is 1000x600, so it needs an explicit
-             width or it sizes the whole window: 380 is the panel's own content width. -->
+             width or it sizes the whole window: 410 is the panel's full width. -->
         <Image x:Name="Waiting"
                Source="/assets/waiting-banner.png"
-               Width="380"
+               Width="410"
                MouseLeftButtonDown="OnPanelDrag"/>
 
         <!-- Standing panel. UniformToFill crops the art's own rounded corners away, so the
@@ -75,28 +75,13 @@
                             Stretch="UniformToFill"
                             Opacity="0.85"/>
             </Border.Background>
-            <!-- Fixed, not Min/Max: the header's track and car sit in star columns, which still
-                 report their text width, so long names grew the panel. Names ellipsize instead. -->
+            <!-- Fixed, not Min/Max, so a long category name ellipsizes rather than growing the panel. -->
             <StackPanel Width="380">
 
-                <!-- Challenge | track | car -->
+                <!-- Category · number -->
                 <Border Style="{StaticResource Row}" Padding="0,0,0,6">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-
-                        <TextBlock x:Name="TitleText" Grid.Column="0" Style="{StaticResource Label}"
-                                   Foreground="{StaticResource Ink}" Text="ARA CHALLENGE OVERLAY"/>
-                        <Border x:Name="HeaderDivider1" Grid.Column="1" Style="{StaticResource Divider}"/>
-                        <TextBlock x:Name="TrackText" Grid.Column="2" Style="{StaticResource Label}"/>
-                        <Border x:Name="HeaderDivider2" Grid.Column="3" Style="{StaticResource Divider}"/>
-                        <TextBlock x:Name="CarText" Grid.Column="4" Style="{StaticResource Label}"/>
-                    </Grid>
+                    <TextBlock x:Name="TitleText" Style="{StaticResource Label}" TextAlignment="Center"
+                               Foreground="{StaticResource Ink}" Text="ARA CHALLENGE OVERLAY"/>
                 </Border>
 
                 <!-- Goal | estimated lap -->
@@ -213,9 +198,11 @@
             </StackPanel>
         </Border>
 
-        <!-- Medal banner, shown for a few seconds when a tier is earned -->
+        <!-- Medal banner, shown for a few seconds when a tier is earned. 410 matches the panel:
+             380 content, 14 padding and 1 border either side. -->
         <Border x:Name="Banner"
                 Visibility="Collapsed"
+                Width="410"
                 Background="#F2101418"
                 CornerRadius="10"
                 BorderThickness="2">
