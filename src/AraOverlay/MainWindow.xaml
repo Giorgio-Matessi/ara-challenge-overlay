@@ -55,10 +55,10 @@
     <Grid x:Name="Root">
 
         <!-- Shown until iRacing is running. The image is 1000x600, so it needs an explicit
-             width or it sizes the whole window: 380 is the panel's own content width. -->
+             width or it sizes the whole window: 410 is the panel's full width. -->
         <Image x:Name="Waiting"
                Source="/assets/waiting-banner.png"
-               Width="380"
+               Width="410"
                MouseLeftButtonDown="OnPanelDrag"/>
 
         <!-- Standing panel. UniformToFill crops the art's own rounded corners away, so the
