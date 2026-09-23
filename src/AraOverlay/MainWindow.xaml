@@ -75,13 +75,12 @@
                             Stretch="UniformToFill"
                             Opacity="0.85"/>
             </Border.Background>
-            <!-- Fixed, not Min/Max: the header's track and car sit in star columns, which still
-                 report their text width, so long names grew the panel. Names ellipsize instead. -->
+            <!-- Fixed, not Min/Max, so a long category name ellipsizes rather than growing the panel. -->
             <StackPanel Width="380">
 
                 <!-- Category · number -->
                 <Border Style="{StaticResource Row}" Padding="0,0,0,6">
-                    <TextBlock x:Name="TitleText" Style="{StaticResource Label}"
+                    <TextBlock x:Name="TitleText" Style="{StaticResource Label}" TextAlignment="Center"
                                Foreground="{StaticResource Ink}" Text="ARA CHALLENGE OVERLAY"/>
                 </Border>
 
@@ -199,9 +198,11 @@
             </StackPanel>
         </Border>
 
-        <!-- Medal banner, shown for a few seconds when a tier is earned -->
+        <!-- Medal banner, shown for a few seconds when a tier is earned. 410 matches the panel:
+             380 content, 14 padding and 1 border either side. -->
         <Border x:Name="Banner"
                 Visibility="Collapsed"
+                Width="410"
                 Background="#F2101418"
                 CornerRadius="10"
                 BorderThickness="2">
