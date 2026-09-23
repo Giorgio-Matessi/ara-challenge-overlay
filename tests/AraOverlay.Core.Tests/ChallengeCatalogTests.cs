@@ -34,10 +34,10 @@ public class ChallengeCatalogTests
     }
 
     [Fact]
-    public void FromJson_RejectsTwoChallengesItCannotTellApart()
+    public void FromJson_KeepsTheFirstOfTwoChallengesItCannotTellApart()
     {
-        // Same track and car, same times: nothing distinguishes them, so the overlay would be
-        // guessing which one the driver is running.
+        // Same track and car, same times: either one grades a lap identically, so the second is
+        // reported rather than costing the whole catalog.
         const string duplicated = """
         [
           { "number": 1, "track": "A", "car": "X", "trackIds": [1], "carId": 2,
@@ -46,7 +46,11 @@ public class ChallengeCatalogTests
             "gold": "1:00.000", "silver": "1:01.000", "bronze": "1:02.000" }
         ]
         """;
-        Assert.Throws<InvalidDataException>(() => { ChallengeCatalog.FromJson(duplicated); });
+        var catalog = ChallengeCatalog.FromJson(duplicated);
+
+        Assert.Equal(1, Assert.Single(catalog.Challenges).Number);
+        Assert.Equal(1, Assert.Single(catalog.Find(1, 2, wet: false)).Number);
+        Assert.Contains("keeping the first", Assert.Single(catalog.Skipped));
     }
 
     [Fact]
@@ -194,6 +198,8 @@ public class ChallengeCatalogTests
     [Fact]
     public void Embedded_LoadsAndEveryRowIsWellFormed()
     {
+        Assert.Empty(ChallengeCatalog.Embedded.Skipped);
+
         foreach (var c in ChallengeCatalog.Embedded.Challenges)
         {
             Assert.False(string.IsNullOrWhiteSpace(c.Track), $"Challenge {c.Number} has no track.");

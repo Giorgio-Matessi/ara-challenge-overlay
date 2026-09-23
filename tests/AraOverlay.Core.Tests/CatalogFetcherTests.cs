@@ -212,10 +212,11 @@ public class CatalogFetcherTests
         };
 
         var fetch = await Fetch(routes);
+        var catalog = new ChallengeCatalog(fetch.Challenges);
 
         Assert.True(fetch.Usable);
-        Assert.Equal("c1", Assert.Single(fetch.Challenges).ContentId);
-        Assert.Contains(fetch.Skipped, s => s.Contains("c8"));
+        Assert.Equal("c1", Assert.Single(catalog.Challenges).ContentId);
+        Assert.Contains(catalog.Skipped, s => s.Contains("c8"));
     }
 
     [Fact]
@@ -236,7 +237,7 @@ public class CatalogFetcherTests
         Assert.Equal(2, fetch.Challenges.Count);
         Assert.Empty(fetch.Skipped);
 
-        var catalog = ChallengeCatalog.FromChallenges(fetch.Challenges);
+        var catalog = new ChallengeCatalog(fetch.Challenges);
         Assert.Equal("dry", Assert.Single(catalog.Find(268, 67, wet: false)).ContentId);
         Assert.Equal("wet", Assert.Single(catalog.Find(268, 67, wet: true)).ContentId);
     }
@@ -246,7 +247,7 @@ public class CatalogFetcherTests
     {
         var routes = new Routes { List = (HttpStatusCode.OK, Listing("plan-a")), Detail = (HttpStatusCode.OK, Detail("c1", 166)) };
 
-        var catalog = ChallengeCatalog.FromChallenges((await Fetch(routes)).Challenges);
+        var catalog = new ChallengeCatalog((await Fetch(routes)).Challenges);
 
         Assert.Equal("c1", Assert.Single(catalog.Find(166, 67, wet: false)).ContentId);
     }
