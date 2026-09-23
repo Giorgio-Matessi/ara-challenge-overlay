@@ -1,11 +1,7 @@
-using System.Reflection;
-using System.Text.Json;
-
 namespace AraOverlay.Core;
 
 /// <summary>
-/// The 20 ARA challenges, embedded in the exe as challenges.json and indexed for lookup by
-/// track and car.
+/// Every challenge read from the ARA Labs API, indexed for lookup by track and car.
 ///
 /// Wet is deliberately not part of the key. The ARA Labs API carries no weather field and cannot
 /// gain one, so a challenge's conditions are read off its targets: within one plan, a track and
@@ -19,13 +15,6 @@ namespace AraOverlay.Core;
 /// </summary>
 public sealed class ChallengeCatalog
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        ReadCommentHandling = JsonCommentHandling.Skip,
-        AllowTrailingCommas = true,
-    };
-
     private readonly Dictionary<(int Track, int Car), List<Challenge>> _byCombination = new();
 
     public IReadOnlyList<Challenge> Challenges { get; }
@@ -84,19 +73,6 @@ public sealed class ChallengeCatalog
         Skipped = skipped;
     }
 
-    public static ChallengeCatalog Embedded { get; } = LoadEmbedded();
-
-    /// <summary>Builds a catalog from JSON text.</summary>
-    /// <param name="json">A challenges.json document.</param>
-    /// <returns>The catalog.</returns>
-    /// <exception cref="InvalidDataException">The document isn't a usable list.</exception>
-    public static ChallengeCatalog FromJson(string json)
-    {
-        var challenges = JsonSerializer.Deserialize<List<Challenge>>(json, JsonOptions)
-            ?? throw new InvalidDataException("challenges.json did not contain a list.");
-        return new ChallengeCatalog(challenges);
-    }
-
     /// <summary>
     /// Matches a live session, returning one candidate per plan. Wetness picks between a plan's
     /// own wet and dry rows; it says nothing about two plans that happen to share a circuit.
@@ -120,21 +96,5 @@ public sealed class ChallengeCatalog
                         ? plan.MaxBy(c => c.BronzeSeconds)!
                         : plan.MinBy(c => c.BronzeSeconds)!)
         ];
-    }
-
-    /// <summary>Reads the challenges.json compiled into this assembly.</summary>
-    /// <returns>The catalog it describes.</returns>
-    /// <exception cref="InvalidDataException">The resource is missing or unusable.</exception>
-    private static ChallengeCatalog LoadEmbedded()
-    {
-        var assembly = Assembly.GetExecutingAssembly();
-
-        // Matched by suffix so renaming the root namespace can't silently break the lookup.
-        var name = Array.Find(assembly.GetManifestResourceNames(), n => n.EndsWith("challenges.json", StringComparison.Ordinal))
-            ?? throw new InvalidDataException("challenges.json is not embedded in the assembly.");
-
-        using var stream = assembly.GetManifestResourceStream(name)!;
-        using var reader = new StreamReader(stream);
-        return FromJson(reader.ReadToEnd());
     }
 }

@@ -109,10 +109,8 @@ public static class ApiCatalog
             Number = number,
             ContentId = contentId,
             Plan = plan,
-            Track = Text(trackInfo, "name") ?? "",
-            Car = car.Name,
             TrackIds = [trackId],
-            CarId = car.Id,
+            CarId = car,
             Gold = targets.Gold,
             Silver = targets.Silver,
             Bronze = targets.Bronze,
@@ -136,7 +134,7 @@ public static class ApiCatalog
     /// <summary>Reads the cars an item applies to, as iRacing ids.</summary>
     /// <param name="item">The content item.</param>
     /// <returns>One entry per listed car, or null if any listed car has no iRacing mapping.</returns>
-    private static List<(int Id, string Name)>? Cars(JsonElement item)
+    private static List<int>? Cars(JsonElement item)
     {
         // An empty cars list means every car. Nothing in the series uses it and the panel has no
         // way to show it, so it falls through as unmapped and is reported rather than guessed at.
@@ -146,7 +144,7 @@ public static class ApiCatalog
             ? carInfos.EnumerateArray().ToList()
             : [];
 
-        var mapped = new List<(int, string)>();
+        var mapped = new List<int>();
 
         foreach (var car in cars.EnumerateArray())
         {
@@ -155,7 +153,7 @@ public static class ApiCatalog
             var info = infos.Find(i => i.TryGetProperty("id", out var id) && id.TryGetInt32(out var v) && v == garage61Id);
             if (PlatformId(info) is not { } carId) return null;
 
-            mapped.Add((carId, Text(info, "name") ?? ""));
+            mapped.Add(carId);
         }
 
         return mapped;

@@ -79,24 +79,10 @@
                  report their text width, so long names grew the panel. Names ellipsize instead. -->
             <StackPanel Width="380">
 
-                <!-- Challenge | track | car -->
+                <!-- Category · number -->
                 <Border Style="{StaticResource Row}" Padding="0,0,0,6">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-
-                        <TextBlock x:Name="TitleText" Grid.Column="0" Style="{StaticResource Label}"
-                                   Foreground="{StaticResource Ink}" Text="ARA CHALLENGE OVERLAY"/>
-                        <Border x:Name="HeaderDivider1" Grid.Column="1" Style="{StaticResource Divider}"/>
-                        <TextBlock x:Name="TrackText" Grid.Column="2" Style="{StaticResource Label}"/>
-                        <Border x:Name="HeaderDivider2" Grid.Column="3" Style="{StaticResource Divider}"/>
-                        <TextBlock x:Name="CarText" Grid.Column="4" Style="{StaticResource Label}"/>
-                    </Grid>
+                    <TextBlock x:Name="TitleText" Style="{StaticResource Label}"
+                               Foreground="{StaticResource Ink}" Text="ARA CHALLENGE OVERLAY"/>
                 </Border>
 
                 <!-- Goal | estimated lap -->

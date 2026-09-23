@@ -10,7 +10,7 @@ public sealed record CachedCatalog(List<Challenge> Challenges);
 /// <summary>
 /// Keeps the last good catalog under %APPDATA% so the overlay opens on real targets rather than
 /// waiting on a refresh, and keeps working through an outage, an expired session, or a flight
-/// with no internet. It is not secret: the same data ships embedded in the exe.
+/// with no internet. It is not secret: it is only the challenge list and its targets.
 /// </summary>
 public static class CatalogCache
 {
@@ -22,9 +22,9 @@ public static class CatalogCache
         JsonFile.Save(FilePath, new CachedCatalog([.. challenges]));
 
     /// <summary>
-    /// Resolves what the overlay should actually use: the cache when it loads, and the embedded
-    /// rows otherwise. A cache the catalog rejects is treated as absent rather than fatal — a bad
-    /// file must not stop the overlay starting.
+    /// Resolves what the overlay should actually use: the cache when it loads, and an empty
+    /// catalog until the first sign-in otherwise. A cache the catalog rejects is treated as absent
+    /// rather than fatal — a bad file must not stop the overlay starting.
     /// </summary>
     /// <returns>The catalog to run on.</returns>
     public static ChallengeCatalog Resolve()
@@ -38,6 +38,6 @@ public static class CatalogCache
         {
         }
 
-        return ChallengeCatalog.Embedded;
+        return new ChallengeCatalog([]);
     }
 }

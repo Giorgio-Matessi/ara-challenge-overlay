@@ -1,7 +1,8 @@
 # ARA Challenge Overlay
 
-An iRacing overlay for the **Almeida Racing Academy** 20-challenge series. It watches the sim,
-works out which challenge you've loaded from the track and car, shows the Bronze / Silver / Gold
+An iRacing overlay for the **Almeida Racing Academy** challenges — Academy, Weekly, and whatever
+else ARA publishes. It watches the sim, works out which challenge you've loaded from the track and
+car, shows the Bronze / Silver / Gold
 target times, and pops a banner the moment you set a clean lap quick enough to earn a medal.
 
 ## Requirements
@@ -27,14 +28,14 @@ On a challenge's track and car, the panel reads top to bottom:
 
 | Row | |
 |---|---|
-| **Challenge / track / car** | Which challenge you've loaded. Wet challenges are marked. |
+| **Category · number** | Which challenge you've loaded, e.g. `ACADEMY CHALLENGES · 3`. Wet sessions are marked. |
 | **Goal / est. lap** | The tier you're chasing next and its target, against a live projection of the lap you're on. Once the lap is spoiled this cell says what spoiled it instead. |
 | **The big number** | How far your last lap sat from the goal. Red and `▼` means there's still time to find; green and `▲` means you cleared it. |
 | **Last lap / session best** | Your last completed lap, and the quickest clean one this session. |
 | **Gold / silver / bronze** | All three targets, with a ✓ on every medal you already hold. |
 
-On anything else it shows the track and car ids the sim reported plus the detected conditions,
-so you can check them against `challenges.json`.
+On anything else it shows the track and car ids the sim reported plus the detected conditions.
+Before your first sign-in it has no challenges at all and says so.
 
 Right-click the tray icon for:
 
@@ -58,32 +59,15 @@ The banner only fires when you *improve* a tier, so a second gold lap won't inte
 
 ## The challenge list
 
-`src/AraOverlay.Core/challenges.json` is embedded into the exe at build time. Each row is keyed
-on iRacing's **internal ids**, not the display names:
+Challenges come from the ARA Labs API (`/api/v1/garage61/training-plans`) after you sign in from
+the tray. Each training plan is a category, and its name is what the panel shows. The last good
+list is cached in `%APPDATA%\AraOverlay\challenges.cache.json`, so the overlay keeps working
+offline and through an expired session. Nothing is embedded in the exe.
 
-```json
-{
-  "number": 19,
-  "name": "Le Mans (24 Heures du Mans) — Dallara P217 · WET",
-  "trackId": "lemans 24h",        // WeekendInfo:TrackName
-  "carId":   "dallarap217",       // DriverInfo:CarPath
-  "wet":     true,                // challenges 16-20 only
-  "bronze":  "4:13.700",
-  "silver":  "4:11.200",
-  "gold":    "4:10.200"
-}
-```
-
-Challenges **16-20 are the wet-weather versions**, so conditions are part of what identifies a
-challenge — 14 and 19 are the same car on the same Le Mans layout, 35 seconds apart. The overlay
-reads `TrackWetness` and `WeatherDeclaredWet` from the sim and picks the matching version. It
-uses two different thresholds on the way up and the way down, so a drying track can't flip the
-active challenge back and forth. A wet challenge simply won't match in the dry, which is
-deliberate: its targets would be free golds on a dry track.
-
-Those ids aren't reliably guessable from a track or car name, so if a challenge never lights up:
-load it in the sim and read the ids straight off the overlay's unmatched panel, then paste them
-over the row. The tests will catch out-of-order times and duplicate track+car pairs at build time.
+Challenges match on iRacing's numeric track and car ids. Where one plan uses the same track and
+car twice, that is its wet and dry pair and the slower targets are the wet ones; the overlay picks
+between them from the sim's live track wetness. If one track and car belongs to more than one plan,
+the tray menu lets you choose which challenge you're running.
 
 ## Changing the icon
 

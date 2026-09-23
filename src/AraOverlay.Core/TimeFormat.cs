@@ -2,7 +2,7 @@ using System.Globalization;
 
 namespace AraOverlay.Core;
 
-/// <summary>Converts lap times between seconds and the "M:SS.fff" strings used in challenges.json.</summary>
+/// <summary>Converts lap times between seconds and "M:SS.fff" strings.</summary>
 public static class TimeFormat
 {
     /// <summary>Parses a lap time.</summary>

@@ -1,15 +1,24 @@
+using System.Text.Json;
 using AraOverlay.Core;
 
 namespace AraOverlay.Core.Tests;
 
-/// <summary>Covers loading challenges.json, matching a session, and the guards on a bad row.</summary>
+/// <summary>Covers matching a session against the catalog, and the guards on a bad row.</summary>
 public class ChallengeCatalogTests
 {
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+
+    /// <summary>Builds a catalog from a JSON list of challenges.</summary>
+    /// <param name="json">The rows.</param>
+    /// <returns>The catalog.</returns>
+    private static ChallengeCatalog FromJson(string json) =>
+        new(JsonSerializer.Deserialize<List<Challenge>>(json, JsonOptions)!);
+
     private const string TwoRows = """
     [
-      { "number": 1, "track": "A", "car": "X", "trackIds": [299], "carId": 142,
+      { "number": 1, "trackIds": [299], "carId": 142,
         "gold": "0:53.500", "silver": "0:54.200", "bronze": "0:55.000" },
-      { "number": 2, "track": "B", "car": "X", "trackIds": [181], "carId": 67,
+      { "number": 2, "trackIds": [181], "carId": 67,
         "gold": "2:30.000", "silver": "2:32.000", "bronze": "2:34.000" }
     ]
     """;
@@ -17,7 +26,7 @@ public class ChallengeCatalogTests
     [Fact]
     public void Find_MatchesOnTrackAndCar()
     {
-        var catalog = ChallengeCatalog.FromJson(TwoRows);
+        var catalog = FromJson(TwoRows);
         Assert.Equal(1, Assert.Single(catalog.Find(299, 142, wet: false)).Number);
         Assert.Equal(2, Assert.Single(catalog.Find(181, 67, wet: false)).Number);
     }
@@ -30,7 +39,7 @@ public class ChallengeCatalogTests
     [InlineData(-1, -1)]
     public void Find_ReturnsNothingWhenNothingMatches(int track, int car)
     {
-        Assert.Empty(ChallengeCatalog.FromJson(TwoRows).Find(track, car, wet: false));
+        Assert.Empty(FromJson(TwoRows).Find(track, car, wet: false));
     }
 
     [Fact]
@@ -40,13 +49,13 @@ public class ChallengeCatalogTests
         // reported rather than costing the whole catalog.
         const string duplicated = """
         [
-          { "number": 1, "track": "A", "car": "X", "trackIds": [1], "carId": 2,
+          { "number": 1, "trackIds": [1], "carId": 2,
             "gold": "1:00.000", "silver": "1:01.000", "bronze": "1:02.000" },
-          { "number": 2, "track": "B", "car": "X", "trackIds": [1], "carId": 2,
+          { "number": 2, "trackIds": [1], "carId": 2,
             "gold": "1:00.000", "silver": "1:01.000", "bronze": "1:02.000" }
         ]
         """;
-        var catalog = ChallengeCatalog.FromJson(duplicated);
+        var catalog = FromJson(duplicated);
 
         Assert.Equal(1, Assert.Single(catalog.Challenges).Number);
         Assert.Equal(1, Assert.Single(catalog.Find(1, 2, wet: false)).Number);
@@ -59,15 +68,15 @@ public class ChallengeCatalogTests
         // Wet and dry is the only split the overlay can resolve; a third would be a new rule.
         const string three = """
         [
-          { "number": 1, "track": "A", "car": "X", "trackIds": [1], "carId": 2,
+          { "number": 1, "trackIds": [1], "carId": 2,
             "gold": "1:00.000", "silver": "1:01.000", "bronze": "1:02.000" },
-          { "number": 2, "track": "A", "car": "X", "trackIds": [1], "carId": 2,
+          { "number": 2, "trackIds": [1], "carId": 2,
             "gold": "2:00.000", "silver": "2:01.000", "bronze": "2:02.000" },
-          { "number": 3, "track": "A", "car": "X", "trackIds": [1], "carId": 2,
+          { "number": 3, "trackIds": [1], "carId": 2,
             "gold": "3:00.000", "silver": "3:01.000", "bronze": "3:02.000" }
         ]
         """;
-        Assert.Throws<InvalidDataException>(() => { ChallengeCatalog.FromJson(three); });
+        Assert.Throws<InvalidDataException>(() => { FromJson(three); });
     }
 
     [Fact]
@@ -77,14 +86,14 @@ public class ChallengeCatalogTests
         // data says which is wet — the wet one is 34 seconds slower, and that's the whole signal.
         const string lemans = """
         [
-          { "number": 14, "track": "Le Mans dry", "car": "X", "trackIds": [268], "carId": 128,
+          { "number": 14, "trackIds": [268], "carId": 128,
             "gold": "3:36.250", "silver": "3:37.000", "bronze": "3:38.800" },
-          { "number": 19, "track": "Le Mans wet", "car": "X", "trackIds": [268], "carId": 128,
+          { "number": 19, "trackIds": [268], "carId": 128,
             "gold": "4:10.200", "silver": "4:11.200", "bronze": "4:13.700" }
         ]
         """;
 
-        var catalog = ChallengeCatalog.FromJson(lemans);
+        var catalog = FromJson(lemans);
         Assert.Equal(14, Assert.Single(catalog.Find(268, 128, wet: false)).Number);
         Assert.Equal(19, Assert.Single(catalog.Find(268, 128, wet: true)).Number);
     }
@@ -94,7 +103,7 @@ public class ChallengeCatalogTests
     {
         // Challenges only count in a league session, where ARA sets the weather, so a lone
         // challenge for a track and car is the one being run whatever the sky is doing.
-        var catalog = ChallengeCatalog.FromJson(TwoRows);
+        var catalog = FromJson(TwoRows);
         Assert.Equal(1, Assert.Single(catalog.Find(299, 142, wet: true)).Number);
         Assert.Equal(1, Assert.Single(catalog.Find(299, 142, wet: false)).Number);
     }
@@ -105,12 +114,12 @@ public class ChallengeCatalogTests
         // This is challenges 11 and 18: the league counts either Spa layout.
         const string spa = """
         [
-          { "number": 11, "track": "Spa", "car": "X", "trackIds": [523, 163], "carId": 128,
+          { "number": 11, "trackIds": [523, 163], "carId": 128,
             "gold": "2:07.900", "silver": "2:08.700", "bronze": "2:09.700" }
         ]
         """;
 
-        var catalog = ChallengeCatalog.FromJson(spa);
+        var catalog = FromJson(spa);
         Assert.Equal(11, Assert.Single(catalog.Find(523, 128, wet: false)).Number);
         Assert.Equal(11, Assert.Single(catalog.Find(163, 128, wet: false)).Number);
         Assert.Empty(catalog.Find(268, 128, wet: false));
@@ -123,16 +132,14 @@ public class ChallengeCatalogTests
         // could be attempting and no telemetry says which, so the lookup offers both.
         const string twoPlans = """
         [
-          { "number": 17, "plan": "ARA Challenges", "track": "Summit Point", "car": "MX-5",
-            "trackIds": [9], "carId": 67,
+          { "number": 17, "plan": "ARA Challenges", "trackIds": [9], "carId": 67,
             "gold": "1:30.600", "silver": "1:31.150", "bronze": "1:31.950" },
-          { "number": 3, "plan": "MX-5 Series", "track": "Summit Point", "car": "MX-5",
-            "trackIds": [9], "carId": 67,
+          { "number": 3, "plan": "MX-5 Series", "trackIds": [9], "carId": 67,
             "gold": "1:20.475", "silver": "1:20.750", "bronze": "1:21.500" }
         ]
         """;
 
-        var catalog = ChallengeCatalog.FromJson(twoPlans);
+        var catalog = FromJson(twoPlans);
 
         Assert.Equal([17, 3], catalog.Find(9, 67, wet: false).Select(c => c.Number));
         Assert.Equal([17, 3], catalog.Find(9, 67, wet: true).Select(c => c.Number));
@@ -144,19 +151,16 @@ public class ChallengeCatalogTests
         // The slower row is the wet one of its own plan, never another plan's challenge.
         const string mixed = """
         [
-          { "number": 14, "plan": "ARA Challenges", "track": "Le Mans", "car": "P217",
-            "trackIds": [268], "carId": 128,
+          { "number": 14, "plan": "ARA Challenges", "trackIds": [268], "carId": 128,
             "gold": "3:36.250", "silver": "3:37.000", "bronze": "3:38.800" },
-          { "number": 19, "plan": "ARA Challenges", "track": "Le Mans wet", "car": "P217",
-            "trackIds": [268], "carId": 128,
+          { "number": 19, "plan": "ARA Challenges", "trackIds": [268], "carId": 128,
             "gold": "4:10.200", "silver": "4:11.200", "bronze": "4:13.700" },
-          { "number": 12, "plan": "MX-5 Series", "track": "Le Mans", "car": "P217",
-            "trackIds": [268], "carId": 128,
+          { "number": 12, "plan": "MX-5 Series", "trackIds": [268], "carId": 128,
             "gold": "5:20.500", "silver": "5:23.000", "bronze": "5:28.500" }
         ]
         """;
 
-        var catalog = ChallengeCatalog.FromJson(mixed);
+        var catalog = FromJson(mixed);
 
         Assert.Equal([14, 12], catalog.Find(268, 128, wet: false).Select(c => c.Number));
         Assert.Equal([19, 12], catalog.Find(268, 128, wet: true).Select(c => c.Number));
@@ -167,20 +171,11 @@ public class ChallengeCatalogTests
     {
         const string none = """
         [
-          { "number": 1, "track": "A", "car": "X", "trackIds": [], "carId": 2,
+          { "number": 1, "trackIds": [], "carId": 2,
             "gold": "1:00.000", "silver": "1:01.000", "bronze": "1:02.000" }
         ]
         """;
-        Assert.Throws<InvalidDataException>(() => { ChallengeCatalog.FromJson(none); });
-    }
-
-    [Fact]
-    public void Embedded_NamesTheTrackAndCarSeparatelyForTheOverlayHeader()
-    {
-        // The overlay puts them on their own lines, so neither may carry the other.
-        var c = ChallengeCatalog.Embedded.Challenges.Single(c => c.Number == 13);
-        Assert.Equal("Sebring International Raceway (International)", c.Track);
-        Assert.Equal("NASCAR Truck Chevrolet Silverado - 2008", c.Car);
+        Assert.Throws<InvalidDataException>(() => { FromJson(none); });
     }
 
     [Fact]
@@ -188,60 +183,10 @@ public class ChallengeCatalogTests
     {
         const string backwards = """
         [
-          { "number": 1, "track": "A", "car": "X", "trackIds": [1], "carId": 2,
+          { "number": 1, "trackIds": [1], "carId": 2,
             "gold": "1:05.000", "silver": "1:01.000", "bronze": "1:02.000" }
         ]
         """;
-        Assert.Throws<InvalidDataException>(() => { ChallengeCatalog.FromJson(backwards); });
-    }
-
-    [Fact]
-    public void Embedded_LoadsAndEveryRowIsWellFormed()
-    {
-        Assert.Empty(ChallengeCatalog.Embedded.Skipped);
-
-        foreach (var c in ChallengeCatalog.Embedded.Challenges)
-        {
-            Assert.False(string.IsNullOrWhiteSpace(c.Track), $"Challenge {c.Number} has no track.");
-            Assert.False(string.IsNullOrWhiteSpace(c.Car), $"Challenge {c.Number} has no car.");
-            Assert.NotEmpty(c.TrackIds);
-            Assert.True(c.CarId > 0, $"Challenge {c.Number} has no carId.");
-            c.Validate();
-        }
-    }
-
-    [Fact]
-    public void Embedded_NeedsTheWeatherForLeMansAndNothingElse()
-    {
-        // Every other challenge is alone on its track and car, so wetness never decides it. If a
-        // second combination ever doubles up, the wet/dry split has to be checked by hand.
-        var doubled = ChallengeCatalog.Embedded.Challenges
-            .SelectMany(c => c.TrackIds.Select(t => (Track: t, c.CarId)))
-            .GroupBy(k => k)
-            .Where(g => g.Count() > 1)
-            .Select(g => g.Key)
-            .ToList();
-
-        Assert.Equal([(268, 128)], doubled);
-    }
-
-    [Fact]
-    public void Embedded_GivesEveryChallengeAProgressKey()
-    {
-        var keys = ChallengeCatalog.Embedded.Challenges.Select(c => c.Key).ToList();
-
-        Assert.Equal(keys.Count, keys.Distinct().Count());
-        Assert.All(keys, k => Assert.StartsWith("local:", k));
-    }
-
-    [Fact]
-    public void Embedded_NumbersTheChallengesOneToTwenty()
-    {
-        var numbers = ChallengeCatalog.Embedded.Challenges.Select(c => c.Number).OrderBy(n => n).ToList();
-
-        Assert.True(numbers.SequenceEqual(Enumerable.Range(1, 20)),
-            $"challenges.json holds {numbers.Count} of the 20 ARA challenges " +
-            $"(numbers: {string.Join(", ", numbers)}). Add the missing rows to " +
-            "src/AraOverlay.Core/challenges.json — this test is the reminder.");
+        Assert.Throws<InvalidDataException>(() => { FromJson(backwards); });
     }
 }

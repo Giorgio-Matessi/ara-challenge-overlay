@@ -219,12 +219,18 @@ public partial class MainWindow : Window
 
     private static readonly Medal[] DemoTiers = [Medal.None, Medal.Bronze, Medal.Silver, Medal.Gold];
 
+    private static readonly Challenge[] DemoChallenges =
+    [
+        new() { Plan = "Academy Challenges", Number = 1, TrackIds = [1], Gold = "0:49.299", Silver = "0:49.599", Bronze = "0:49.899" },
+        new() { Plan = "Academy Challenges", Number = 14, TrackIds = [1], Gold = "3:36.250", Silver = "3:37.000", Bronze = "3:38.800" },
+        new() { Plan = "Weekly Challenges", Number = 2, TrackIds = [1], Gold = "1:06.100", Silver = "1:06.600", Bronze = "1:07.100" },
+        new() { Plan = "Weekly Challenges", Number = 12, TrackIds = [1], Gold = "1:44.000", Silver = "1:44.700", Bronze = "1:45.500" },
+    ];
+
     /// <summary>Cycles every challenge and medal state with no sim attached, for --demo.</summary>
     private void StartDemo()
     {
         _demo = true;
-
-        var challenges = ChallengeCatalog.Embedded.Challenges.OrderBy(c => c.Number).ToList();
 
         // Opens on the waiting art, then an unmatched session, then the challenge cycle.
         var step = -1;
@@ -240,12 +246,12 @@ public partial class MainWindow : Window
             {
                 step++;
                 HideBanner();
-                ShowUnmatched("track  0  \ncar    0  \ncond   dry");
+                ShowUnmatched(NoChallengeTitle, "track  0  \ncar    0  \ncond   dry");
                 return;
             }
 
-            var index = step / 2 % challenges.Count;
-            var challenge = challenges[index];
+            var index = step / 2 % DemoChallenges.Length;
+            var challenge = DemoChallenges[index];
             var medal = DemoTiers[index % DemoTiers.Length];
             var lap = medal == Medal.None ? challenge.BronzeSeconds + 1.234 : challenge.TargetFor(medal) - 0.05;
 
@@ -317,7 +323,8 @@ public partial class MainWindow : Window
         }
         else
         {
-            ShowUnmatched($"track  {_sdk.TrackId}  {_sdk.TrackName}\n" +
+            ShowUnmatched(_sdk.HasChallenges ? NoChallengeTitle : "SIGN IN FROM THE TRAY TO LOAD CHALLENGES",
+                          $"track  {_sdk.TrackId}  {_sdk.TrackName}\n" +
                           $"car    {_sdk.CarId}  {_sdk.CarName}\n" +
                           $"cond   {(_sdk.IsWet ? "wet" : "dry")}");
         }
@@ -547,19 +554,20 @@ public partial class MainWindow : Window
     {
         var rows = mode == PanelMode.Challenge ? Visibility.Visible : Visibility.Collapsed;
 
-        TrackText.Visibility = CarText.Visibility = rows;
-        HeaderDivider1.Visibility = HeaderDivider2.Visibility = rows;
         GoalRow.Visibility = DeltaRow.Visibility = rows;
         LapRow.Visibility = Targets.Visibility = rows;
         StatusText.Visibility = mode == PanelMode.Unmatched ? Visibility.Visible : Visibility.Collapsed;
         Login.Visibility = mode == PanelMode.SigningIn ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    private const string NoChallengeTitle = "NO ARA CHALLENGE FOR THIS COMBINATION";
+
     /// <summary>Shows the ids the sim reported, for a track and car matching no challenge.</summary>
+    /// <param name="title">Why nothing matched.</param>
     /// <param name="detail">The lines to print under the title.</param>
-    private void ShowUnmatched(string detail)
+    private void ShowUnmatched(string title, string detail)
     {
-        TitleText.Text = "NO ARA CHALLENGE FOR THIS COMBINATION";
+        TitleText.Text = title;
         SetPanelMode(PanelMode.Unmatched);
         StatusText.Text = detail;
     }
@@ -572,8 +580,6 @@ public partial class MainWindow : Window
         TitleText.Text = challenge.Plan.Length > 0
             ? $"{challenge.Plan.ToUpperInvariant()}  ·  {challenge.Number}{(_sdk.IsWet ? "  ·  WET" : "")}"
             : $"CHALLENGE {challenge.Number}{(_sdk.IsWet ? "  ·  WET" : "")}";
-        TrackText.Text = challenge.Track.ToUpperInvariant();
-        CarText.Text = challenge.Car.ToUpperInvariant();
 
         SetPanelMode(PanelMode.Challenge);
 
@@ -738,7 +744,7 @@ public partial class MainWindow : Window
         BannerArt.Background = (ImageBrush)FindResource($"{medal}Art");
         Banner.BorderBrush = (SolidColorBrush)FindResource(medal.ToString());
         BannerTime.Text = TimeFormat.Format(seconds);
-        BannerSub.Text = $"Challenge {challenge.Number} — {challenge.Track}";
+        BannerSub.Text = challenge.Plan.Length > 0 ? $"{challenge.Plan} — {challenge.Number}" : $"Challenge {challenge.Number}";
 
         ShowLayer(Layer.Medal);
 
