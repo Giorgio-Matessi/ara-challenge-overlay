@@ -45,7 +45,7 @@ public partial class MainWindow : Window
     private readonly Settings _settings = Settings.Load();
     private readonly ProgressStore _progress = new(JsonFile.PathIn("progress.json"));
     private readonly SdkService _sdk = new();
-    private readonly DispatcherTimer _bannerTimer = new() { Interval = TimeSpan.FromSeconds(8) };
+    private readonly DispatcherTimer _bannerTimer = new() { Interval = TimeSpan.FromSeconds(3) };
     private readonly DispatcherTimer _loginTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly ApiClient _api = new();
     private readonly DispatcherTimer _refreshTimer = new() { Interval = TimeSpan.FromMinutes(15) };
@@ -755,7 +755,7 @@ public partial class MainWindow : Window
     private Layer RestingLayer =>
         _demo || _sdk.Connected || SigningIn || _loginStatus.Message.Length > 0 ? Layer.Panel : Layer.Waiting;
 
-    /// <summary>Shows the medal banner in place of the panel, for eight seconds.</summary>
+    /// <summary>Shows the medal banner in place of the panel, for three seconds.</summary>
     /// <param name="medal">The medal earned; None shows nothing.</param>
     /// <param name="seconds">The lap time that earned it.</param>
     /// <param name="challenge">The challenge it was set on.</param>
