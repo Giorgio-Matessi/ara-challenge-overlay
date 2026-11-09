@@ -89,8 +89,8 @@ public partial class MainWindow : Window
     {
         base.OnSourceInitialized(e);
         _hwnd = new WindowInteropHelper(this).Handle;
-        ApplyWindowStyles();
         ClaimLockHotkey();
+        ApplyWindowStyles();
         BuildTrayIcon();
 
         if (Environment.GetCommandLineArgs().Contains("--demo"))
@@ -106,7 +106,11 @@ public partial class MainWindow : Window
         RefreshCatalog();
     }
 
-    /// <summary>Sets click-through for the current lock state and colours the panel border.</summary>
+    /// <summary>
+    /// Sets click-through for the current lock state, outlines the panel in Ink while unlocked
+    /// (Gold already means the gold medal), and shows how to move and lock it. Needs the hotkey
+    /// claimed first, so the hint only names Ctrl+Alt+L when it works.
+    /// </summary>
     private void ApplyWindowStyles()
     {
         var style = GetWindowLong(_hwnd, GWL_EXSTYLE) | WS_EX_TOOLWINDOW;
@@ -118,7 +122,12 @@ public partial class MainWindow : Window
 
         Panel.BorderBrush = _settings.Locked
             ? new SolidColorBrush(Color.FromArgb(0x20, 0xFF, 0xFF, 0xFF))
-            : new SolidColorBrush(Color.FromArgb(0xFF, 0x4C, 0xC2, 0xFF));
+            : (SolidColorBrush)FindResource("Ink");
+
+        LockHint.Text = WaitingHint.Text = _hotkeyClaimed
+            ? "DRAG TO MOVE  ·  CTRL+ALT+L TO LOCK"
+            : "DRAG TO MOVE  ·  LOCK FROM THE TRAY";
+        LockHint.Visibility = WaitingHint.Visibility = _settings.Locked ? Visibility.Collapsed : Visibility.Visible;
     }
 
     /// <summary>
@@ -554,13 +563,14 @@ public partial class MainWindow : Window
 
     private enum PanelMode { Challenge, Unmatched, SigningIn }
 
-    /// <summary>Swaps between the challenge rows, the id listing, and the login code.</summary>
+    /// <summary>Swaps between the challenge rows, the id listing, and the login code; WET shows only on a wet challenge.</summary>
     /// <param name="mode">Which of the three the panel is showing.</param>
     private void SetPanelMode(PanelMode mode)
     {
         var rows = mode == PanelMode.Challenge ? Visibility.Visible : Visibility.Collapsed;
 
         DeltaRow.Visibility = Medals.Visibility = FooterText.Visibility = rows;
+        WetMark.Visibility = mode == PanelMode.Challenge && _sdk.IsWet ? Visibility.Visible : Visibility.Collapsed;
         StatusText.Visibility = mode == PanelMode.Unmatched ? Visibility.Visible : Visibility.Collapsed;
         Login.Visibility = mode == PanelMode.SigningIn ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -583,8 +593,8 @@ public partial class MainWindow : Window
     private void ShowChallenge(Challenge challenge, Medal? held = null)
     {
         TitleText.Text = challenge.Plan.Length > 0
-            ? $"{challenge.Plan.ToUpperInvariant()}  ·  {challenge.Number}{(_sdk.IsWet ? "  ·  WET" : "")}"
-            : $"CHALLENGE {challenge.Number}{(_sdk.IsWet ? "  ·  WET" : "")}";
+            ? $"{challenge.Plan.ToUpperInvariant()}  ·  {challenge.Number}"
+            : $"CHALLENGE {challenge.Number}";
 
         SetPanelMode(PanelMode.Challenge);
 
@@ -614,7 +624,7 @@ public partial class MainWindow : Window
             var index = i;
 
             _matchItem.DropDownItems.Add(new Forms.ToolStripMenuItem(
-                match.Plan.Length > 0 ? $"{match.Plan} — {match.Number}" : $"Challenge {match.Number}",
+                match.Plan.Length > 0 ? $"{match.Plan}  ·  {match.Number}" : $"Challenge {match.Number}",
                 null,
                 (_, _) => _sdk.SelectMatch(index))
             {
@@ -766,7 +776,7 @@ public partial class MainWindow : Window
         BannerArt.Background = (ImageBrush)FindResource($"{medal}Art");
         Banner.BorderBrush = (SolidColorBrush)FindResource(medal.ToString());
         BannerTime.Text = TimeFormat.Format(seconds);
-        BannerSub.Text = challenge.Plan.Length > 0 ? $"{challenge.Plan} — {challenge.Number}" : $"Challenge {challenge.Number}";
+        BannerSub.Text = challenge.Plan.Length > 0 ? $"{challenge.Plan}  ·  {challenge.Number}" : $"Challenge {challenge.Number}";
 
         ShowLayer(Layer.Medal);
 

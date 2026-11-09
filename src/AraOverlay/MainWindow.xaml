@@ -51,10 +51,14 @@
 
         <!-- Shown until iRacing is running. The image is 1000x600, so it needs an explicit
              width or it sizes the whole window: 410 is the panel's full width. -->
-        <Image x:Name="Waiting"
-               Source="/assets/waiting-banner.png"
-               Width="410"
-               MouseLeftButtonDown="OnPanelDrag"/>
+        <Grid x:Name="Waiting" MouseLeftButtonDown="OnPanelDrag">
+            <Image Source="/assets/waiting-banner.png" Width="410"/>
+
+            <!-- How to move and lock, while unlocked. Top, where the art is navy across its width. -->
+            <TextBlock x:Name="WaitingHint" Style="{StaticResource Label}" Foreground="{StaticResource Ink}"
+                       HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,10,0,0"
+                       Visibility="Collapsed"/>
+        </Grid>
 
         <!-- Standing panel. UniformToFill crops the art's own rounded corners away, so the
              Border's CornerRadius does the rounding; Opacity matches the flat #D9 it replaced. -->
@@ -73,10 +77,20 @@
             <!-- Fixed, not Min/Max, so a long category name ellipsizes rather than growing the panel. -->
             <StackPanel Width="380">
 
-                <!-- Category · number -->
+                <!-- Category · number. Docked so a long category ellipsizes before the WET pill does. -->
                 <Border Style="{StaticResource Row}" Padding="0,0,0,6">
-                    <TextBlock x:Name="TitleText" Style="{StaticResource Label}" TextAlignment="Center"
-                               Foreground="{StaticResource Ink}" Text="ARA CHALLENGE OVERLAY"/>
+                    <DockPanel HorizontalAlignment="Center">
+                        <!-- Wet sessions only: wet and dry targets differ by up to 34 s. The negative
+                             margin cancels the outline so the row is no taller than when dry. -->
+                        <Border x:Name="WetMark" DockPanel.Dock="Right" Visibility="Collapsed"
+                                BorderBrush="{StaticResource Ink}" BorderThickness="1" CornerRadius="7"
+                                Padding="6,0" Margin="8,-1,0,-1" VerticalAlignment="Center">
+                            <TextBlock Text="WET" FontFamily="Segoe UI Black" FontSize="11"
+                                       Foreground="{StaticResource Ink}"/>
+                        </Border>
+                        <TextBlock x:Name="TitleText" Style="{StaticResource Label}" TextAlignment="Center"
+                                   Foreground="{StaticResource Ink}" Text="ARA CHALLENGE OVERLAY"/>
+                    </DockPanel>
                 </Border>
 
                 <!-- Gap to the goal: live while the lap is clean, else the last lap's -->
@@ -156,6 +170,10 @@
                                HorizontalAlignment="Center"
                                TextWrapping="Wrap" TextAlignment="Center"/>
                 </StackPanel>
+
+                <!-- How to move and lock, while unlocked. Last, so it moves nothing above it. -->
+                <TextBlock x:Name="LockHint" Style="{StaticResource Label}" HorizontalAlignment="Center"
+                           Margin="0,6,0,1" Visibility="Collapsed"/>
             </StackPanel>
         </Border>
 
