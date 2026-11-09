@@ -43,4 +43,10 @@ public static class TimeFormat
         var rest = total - minutes * 60;
         return string.Format(CultureInfo.InvariantCulture, "{0}:{1:00.000}", minutes, rest);
     }
+
+    /// <summary>Renders a gap between two times.</summary>
+    /// <param name="seconds">The gap in seconds; negative is ahead.</param>
+    /// <returns>The gap as "+0.000" or "-0.000".</returns>
+    public static string Delta(double seconds) =>
+        seconds.ToString("+0.000;-0.000", CultureInfo.InvariantCulture);
 }

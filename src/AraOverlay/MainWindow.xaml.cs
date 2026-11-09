@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Globalization;
 using System.IO;
 using System.Media;
 using System.Reflection;
@@ -62,6 +61,8 @@ public partial class MainWindow : Window
     private IntPtr _hwnd;
     private bool _hotkeyClaimed;
     private double? _lastLap;
+    private Medal _goal = Medal.Gold;
+    private double _goalTarget;
     private bool _demo;
 
     /// <summary>Restores the saved position and marshals the SDK's events onto the UI thread.</summary>
@@ -262,12 +263,16 @@ public partial class MainWindow : Window
                 _lastLap = lap;
                 ShowChallenge(challenge, medal);
 
-                SessionBestText.Text = TimeFormat.Format(lap - 0.35);
-                EstLapText.Text = TimeFormat.Format(lap + 0.12);
+                ShowFooter(TimeFormat.Format(lap), lap - 0.35);
+                ShowDelta(new LiveLap(_goalTarget + (index % 2 == 0 ? -0.214 : 0.386), true, ""));
             }
             else if (medal != Medal.None)
             {
                 ShowBanner(medal, lap, challenge);
+            }
+            else
+            {
+                ShowDelta(new LiveLap(null, false, "off track"));
             }
 
             step++;
@@ -554,8 +559,7 @@ public partial class MainWindow : Window
     {
         var rows = mode == PanelMode.Challenge ? Visibility.Visible : Visibility.Collapsed;
 
-        GoalRow.Visibility = DeltaRow.Visibility = rows;
-        LapRow.Visibility = Targets.Visibility = rows;
+        DeltaRow.Visibility = Medals.Visibility = FooterText.Visibility = rows;
         StatusText.Visibility = mode == PanelMode.Unmatched ? Visibility.Visible : Visibility.Collapsed;
         Login.Visibility = mode == PanelMode.SigningIn ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -624,63 +628,81 @@ public partial class MainWindow : Window
     private Medal HeldMedal(Challenge challenge) => _progress.Get(challenge.Key)?.BestMedal ?? Medal.None;
 
     /// <summary>
-    /// Refills the rows that move as laps come in: the held ticks, the goal tier, the big delta
-    /// from the last lap to that tier's target, and the two lap times. Once gold is held the goal
-    /// stays gold, so the delta keeps meaning something.
+    /// Refills everything that moves as laps come in: the goal, the three medal rows, the footer,
+    /// and the delta as of the last lap. Once gold is held the goal stays gold, so the delta keeps
+    /// meaning something.
     /// </summary>
     /// <param name="challenge">The challenge being shown.</param>
     /// <param name="medal">The medal to treat as held.</param>
     private void UpdateLiveRows(Challenge challenge, Medal medal)
     {
-        GoldMark.Text = medal >= Medal.Gold ? "✓" : "";
-        SilverMark.Text = medal >= Medal.Silver ? "✓" : "";
-        BronzeMark.Text = medal >= Medal.Bronze ? "✓" : "";
+        _goal = Challenge.GoalFor(medal);
+        _goalTarget = challenge.TargetFor(_goal);
 
-        var goal = Challenge.NextTierAbove(medal) ?? Medal.Gold;
-        var target = challenge.TargetFor(goal);
+        foreach (var tier in new[] { Medal.Gold, Medal.Silver, Medal.Bronze })
+            ShowTier(tier, medal);
 
-        GoalTier.Text = goal.ToString().ToUpperInvariant();
-        GoalTier.Foreground = (SolidColorBrush)FindResource(goal.ToString());
-        GoalTime.Text = TimeFormat.Format(target);
-
-        SessionBestText.Text = _sdk.SessionBest is { } best ? TimeFormat.Format(best) : "—";
-
-        if (_lastLap is not { } lap)
-        {
-            LastLapText.Text = "—";
-            DeltaText.Text = "—";
-            DeltaText.Foreground = (SolidColorBrush)FindResource("Dim");
-            return;
-        }
-
-        LastLapText.Text = TimeFormat.Format(lap);
-
-        var delta = lap - target;
-        var behind = delta > 0;
-
-        DeltaText.Text = delta.ToString("+0.000;-0.000", CultureInfo.InvariantCulture) + (behind ? "s ▼" : "s ▲");
-        DeltaText.Foreground = (SolidColorBrush)FindResource(behind ? "Behind" : "Ahead");
+        ShowFooter(_lastLap is { } lap ? TimeFormat.Format(lap) : "—", _sdk.SessionBest);
+        ShowDelta(null);
     }
 
+    /// <summary>Draws one medal row: enlarged and marked GOAL if chased, faded and ticked if held.</summary>
+    /// <param name="tier">Which row.</param>
+    /// <param name="held">The best medal held.</param>
+    private void ShowTier(Medal tier, Medal held)
+    {
+        var isGoal = tier == _goal;
+        var isHeld = held >= tier;
+
+        ((FrameworkElement)FindName($"{tier}Row")).Opacity = isHeld && !isGoal ? 0.5 : 1;
+        ((TextBlock)FindName($"{tier}Label")).FontSize = isGoal ? 13 : 11;
+        ((TextBlock)FindName($"{tier}Time")).FontSize = isGoal ? 17 : 13;
+        ((TextBlock)FindName($"{tier}Mark")).Text = isGoal ? (isHeld ? "✓  GOAL" : "GOAL") : isHeld ? "✓" : "";
+    }
+
+    /// <summary>Fills the quiet line under the medals.</summary>
+    /// <param name="last">The last lap, already formatted, since an invalid one carries a suffix.</param>
+    /// <param name="best">The session best, if any.</param>
+    private void ShowFooter(string last, double? best) =>
+        FooterText.Text = $"LAST {last}   ·   BEST {(best is { } b ? TimeFormat.Format(b) : "—")}";
+
     /// <summary>
-    /// Updates the estimated lap, which doubles as the warning line: a spoiled lap shows what
-    /// spoiled it instead of a projection it can no longer earn. Called per frame, so it only
-    /// writes on change.
+    /// Draws the big number: the projected gap to the goal while the lap is clean, what spoiled it
+    /// if it isn't, and the last lap's gap until iRacing has a projection. Called per frame, so it
+    /// only writes on change.
     /// </summary>
+    /// <param name="live">The lap in progress, or null to show the last lap's gap.</param>
+    private void ShowDelta(LiveLap? live)
+    {
+        var tier = _goal.ToString().ToUpperInvariant();
+
+        var (text, caption, brush) =
+            live is { Clean: false } spoiled ? (spoiled.Reason.ToUpperInvariant(), "LAP INVALID", "Behind")
+            : live?.EstimatedSeconds is { } estimate ? Gap(estimate, $"TO {tier}  ·  LIVE")
+            : _lastLap is { } lap ? Gap(lap, $"TO {tier}  ·  LAST LAP")
+            : ("—", $"TO {tier}", "Dim");
+
+        if (DeltaText.Text == text && DeltaCaption.Text == caption) return;
+
+        DeltaText.Text = text;
+        DeltaCaption.Text = caption;
+        DeltaText.Foreground = (SolidColorBrush)FindResource(brush);
+
+        (string, string, string) Gap(double seconds, string label)
+        {
+            var delta = seconds - _goalTarget;
+            return delta > 0
+                ? (TimeFormat.Delta(delta) + "s ▼", label, "Behind")
+                : (TimeFormat.Delta(delta) + "s ▲", label, "Ahead");
+        }
+    }
+
+    /// <summary>Hands the lap in progress to the big number.</summary>
     /// <param name="live">The lap in progress.</param>
     private void OnTick(LiveLap live)
     {
         if (_sdk.Challenge is null) return;
-
-        var text = live.Clean
-            ? live.EstimatedSeconds is { } estimate ? TimeFormat.Format(estimate) : "—"
-            : $"! {live.Reason}";
-
-        if (EstLapText.Text != text)
-        {
-            EstLapText.Text = text;
-            EstLapText.Foreground = (SolidColorBrush)FindResource(live.Clean ? "Ink" : "Behind");
-        }
+        ShowDelta(live);
     }
 
     /// <summary>Records a finished lap and pops the banner if it earned a new tier.</summary>
@@ -691,7 +713,7 @@ public partial class MainWindow : Window
 
         if (lap.Outcome == LapOutcome.Invalidated)
         {
-            LastLapText.Text = $"{TimeFormat.Format(lap.Seconds)}  INVALID";
+            ShowFooter($"{TimeFormat.Format(lap.Seconds)} INVALID", _sdk.SessionBest);
             return;
         }
 

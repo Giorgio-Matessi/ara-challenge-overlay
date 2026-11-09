@@ -50,6 +50,15 @@ public class TimeFormatTests
     }
 
     [Theory]
+    [InlineData(-0.2144, "-0.214")]
+    [InlineData(0.5, "+0.500")]
+    [InlineData(0.0, "+0.000")]
+    public void Delta_AlwaysCarriesASign(double seconds, string expected)
+    {
+        Assert.Equal(expected, TimeFormat.Delta(seconds));
+    }
+
+    [Theory]
     [InlineData("1:23.456")]
     [InlineData("0:59.999")]
     [InlineData("12:00.001")]
