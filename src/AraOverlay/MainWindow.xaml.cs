@@ -45,7 +45,7 @@ public partial class MainWindow : Window
     private readonly Settings _settings = Settings.Load();
     private readonly ProgressStore _progress = new(JsonFile.PathIn("progress.json"));
     private readonly SdkService _sdk = new();
-    private readonly DispatcherTimer _bannerTimer = new() { Interval = TimeSpan.FromSeconds(8) };
+    private readonly DispatcherTimer _bannerTimer = new() { Interval = TimeSpan.FromSeconds(3) };
     private readonly DispatcherTimer _loginTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly ApiClient _api = new();
     private readonly DispatcherTimer _refreshTimer = new() { Interval = TimeSpan.FromMinutes(15) };
@@ -89,8 +89,8 @@ public partial class MainWindow : Window
     {
         base.OnSourceInitialized(e);
         _hwnd = new WindowInteropHelper(this).Handle;
-        ApplyWindowStyles();
         ClaimLockHotkey();
+        ApplyWindowStyles();
         BuildTrayIcon();
 
         if (Environment.GetCommandLineArgs().Contains("--demo"))
@@ -106,7 +106,11 @@ public partial class MainWindow : Window
         RefreshCatalog();
     }
 
-    /// <summary>Sets click-through for the current lock state and colours the panel border.</summary>
+    /// <summary>
+    /// Sets click-through for the current lock state, outlines the panel in Ink while unlocked
+    /// (Gold already means the gold medal), and shows how to move and lock it. Needs the hotkey
+    /// claimed first, so the hint only names Ctrl+Alt+L when it works.
+    /// </summary>
     private void ApplyWindowStyles()
     {
         var style = GetWindowLong(_hwnd, GWL_EXSTYLE) | WS_EX_TOOLWINDOW;
@@ -118,7 +122,12 @@ public partial class MainWindow : Window
 
         Panel.BorderBrush = _settings.Locked
             ? new SolidColorBrush(Color.FromArgb(0x20, 0xFF, 0xFF, 0xFF))
-            : new SolidColorBrush(Color.FromArgb(0xFF, 0x4C, 0xC2, 0xFF));
+            : (SolidColorBrush)FindResource("Ink");
+
+        LockHint.Text = WaitingHint.Text = _hotkeyClaimed
+            ? "DRAG TO MOVE  ·  CTRL+ALT+L TO LOCK"
+            : "DRAG TO MOVE  ·  LOCK FROM THE TRAY";
+        LockHint.Visibility = WaitingHint.Visibility = _settings.Locked ? Visibility.Collapsed : Visibility.Visible;
     }
 
     /// <summary>
@@ -554,13 +563,14 @@ public partial class MainWindow : Window
 
     private enum PanelMode { Challenge, Unmatched, SigningIn }
 
-    /// <summary>Swaps between the challenge rows, the id listing, and the login code.</summary>
+    /// <summary>Swaps between the challenge rows, the id listing, and the login code; WET shows only on a wet challenge.</summary>
     /// <param name="mode">Which of the three the panel is showing.</param>
     private void SetPanelMode(PanelMode mode)
     {
         var rows = mode == PanelMode.Challenge ? Visibility.Visible : Visibility.Collapsed;
 
         DeltaRow.Visibility = Medals.Visibility = FooterText.Visibility = rows;
+        WetMark.Visibility = mode == PanelMode.Challenge && _sdk.IsWet ? Visibility.Visible : Visibility.Collapsed;
         StatusText.Visibility = mode == PanelMode.Unmatched ? Visibility.Visible : Visibility.Collapsed;
         Login.Visibility = mode == PanelMode.SigningIn ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -583,8 +593,8 @@ public partial class MainWindow : Window
     private void ShowChallenge(Challenge challenge, Medal? held = null)
     {
         TitleText.Text = challenge.Plan.Length > 0
-            ? $"{challenge.Plan.ToUpperInvariant()}  ·  {challenge.Number}{(_sdk.IsWet ? "  ·  WET" : "")}"
-            : $"CHALLENGE {challenge.Number}{(_sdk.IsWet ? "  ·  WET" : "")}";
+            ? $"{challenge.Plan.ToUpperInvariant()}  ·  {challenge.Number}"
+            : $"CHALLENGE {challenge.Number}";
 
         SetPanelMode(PanelMode.Challenge);
 
@@ -614,7 +624,7 @@ public partial class MainWindow : Window
             var index = i;
 
             _matchItem.DropDownItems.Add(new Forms.ToolStripMenuItem(
-                match.Plan.Length > 0 ? $"{match.Plan} — {match.Number}" : $"Challenge {match.Number}",
+                match.Plan.Length > 0 ? $"{match.Plan}  ·  {match.Number}" : $"Challenge {match.Number}",
                 null,
                 (_, _) => _sdk.SelectMatch(index))
             {
@@ -647,7 +657,7 @@ public partial class MainWindow : Window
         ShowDelta(null);
     }
 
-    /// <summary>Draws one medal row: enlarged and marked GOAL if chased, faded and ticked if held.</summary>
+    /// <summary>Draws one medal row: enlarged and marked GOAL if chased, greyed and ticked if held.</summary>
     /// <param name="tier">Which row.</param>
     /// <param name="held">The best medal held.</param>
     private void ShowTier(Medal tier, Medal held)
@@ -655,7 +665,8 @@ public partial class MainWindow : Window
         var isGoal = tier == _goal;
         var isHeld = held >= tier;
 
-        ((FrameworkElement)FindName($"{tier}Row")).Opacity = isHeld && !isGoal ? 0.5 : 1;
+        var ink = (SolidColorBrush)FindResource(isHeld && !isGoal ? "Dim" : tier.ToString());
+        foreach (var part in new[] { "Label", "Time", "Mark" }) ((TextBlock)FindName($"{tier}{part}")).Foreground = ink;
         ((TextBlock)FindName($"{tier}Label")).FontSize = isGoal ? 13 : 11;
         ((TextBlock)FindName($"{tier}Time")).FontSize = isGoal ? 17 : 13;
         ((TextBlock)FindName($"{tier}Mark")).Text = isGoal ? (isHeld ? "✓  GOAL" : "GOAL") : isHeld ? "✓" : "";
@@ -692,9 +703,7 @@ public partial class MainWindow : Window
         (string, string, string) Gap(double seconds, string label)
         {
             var delta = seconds - _goalTarget;
-            return delta > 0
-                ? (TimeFormat.Delta(delta) + "s ▼", label, "Behind")
-                : (TimeFormat.Delta(delta) + "s ▲", label, "Ahead");
+            return (TimeFormat.Delta(delta) + "s", label, delta > 0 ? "Behind" : "Ahead");
         }
     }
 
@@ -714,7 +723,8 @@ public partial class MainWindow : Window
 
         if (lap.Outcome == LapOutcome.Invalidated)
         {
-            ShowFooter($"{TimeFormat.Format(lap.Seconds)} INVALID", _sdk.SessionBest);
+            var why = string.IsNullOrEmpty(lap.Reason) ? "" : $" · {lap.Reason.ToUpperInvariant()}";
+            ShowFooter($"{TimeFormat.Format(lap.Seconds)} INVALID{why}", _sdk.SessionBest);
             return;
         }
 
@@ -755,7 +765,7 @@ public partial class MainWindow : Window
     private Layer RestingLayer =>
         _demo || _sdk.Connected || SigningIn || _loginStatus.Message.Length > 0 ? Layer.Panel : Layer.Waiting;
 
-    /// <summary>Shows the medal banner in place of the panel, for eight seconds.</summary>
+    /// <summary>Shows the medal banner in place of the panel, for three seconds.</summary>
     /// <param name="medal">The medal earned; None shows nothing.</param>
     /// <param name="seconds">The lap time that earned it.</param>
     /// <param name="challenge">The challenge it was set on.</param>
@@ -767,7 +777,7 @@ public partial class MainWindow : Window
         BannerArt.Background = (ImageBrush)FindResource($"{medal}Art");
         Banner.BorderBrush = (SolidColorBrush)FindResource(medal.ToString());
         BannerTime.Text = TimeFormat.Format(seconds);
-        BannerSub.Text = challenge.Plan.Length > 0 ? $"{challenge.Plan} — {challenge.Number}" : $"Challenge {challenge.Number}";
+        BannerSub.Text = challenge.Plan.Length > 0 ? $"{challenge.Plan}  ·  {challenge.Number}" : $"Challenge {challenge.Number}";
 
         ShowLayer(Layer.Medal);
 
