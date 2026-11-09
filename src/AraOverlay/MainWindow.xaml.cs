@@ -657,7 +657,7 @@ public partial class MainWindow : Window
         ShowDelta(null);
     }
 
-    /// <summary>Draws one medal row: enlarged and marked GOAL if chased, faded and ticked if held.</summary>
+    /// <summary>Draws one medal row: enlarged and marked GOAL if chased, greyed and ticked if held.</summary>
     /// <param name="tier">Which row.</param>
     /// <param name="held">The best medal held.</param>
     private void ShowTier(Medal tier, Medal held)
@@ -665,7 +665,8 @@ public partial class MainWindow : Window
         var isGoal = tier == _goal;
         var isHeld = held >= tier;
 
-        ((FrameworkElement)FindName($"{tier}Row")).Opacity = isHeld && !isGoal ? 0.5 : 1;
+        var ink = (SolidColorBrush)FindResource(isHeld && !isGoal ? "Dim" : tier.ToString());
+        foreach (var part in new[] { "Label", "Time", "Mark" }) ((TextBlock)FindName($"{tier}{part}")).Foreground = ink;
         ((TextBlock)FindName($"{tier}Label")).FontSize = isGoal ? 13 : 11;
         ((TextBlock)FindName($"{tier}Time")).FontSize = isGoal ? 17 : 13;
         ((TextBlock)FindName($"{tier}Mark")).Text = isGoal ? (isHeld ? "✓  GOAL" : "GOAL") : isHeld ? "✓" : "";
