@@ -692,9 +692,7 @@ public partial class MainWindow : Window
         (string, string, string) Gap(double seconds, string label)
         {
             var delta = seconds - _goalTarget;
-            return delta > 0
-                ? (TimeFormat.Delta(delta) + "s ▼", label, "Behind")
-                : (TimeFormat.Delta(delta) + "s ▲", label, "Ahead");
+            return (TimeFormat.Delta(delta) + "s", label, delta > 0 ? "Behind" : "Ahead");
         }
     }
 
@@ -714,7 +712,8 @@ public partial class MainWindow : Window
 
         if (lap.Outcome == LapOutcome.Invalidated)
         {
-            ShowFooter($"{TimeFormat.Format(lap.Seconds)} INVALID", _sdk.SessionBest);
+            var why = string.IsNullOrEmpty(lap.Reason) ? "" : $" · {lap.Reason.ToUpperInvariant()}";
+            ShowFooter($"{TimeFormat.Format(lap.Seconds)} INVALID{why}", _sdk.SessionBest);
             return;
         }
 
