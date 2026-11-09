@@ -6,3 +6,6 @@ obj/
 .DS_Store
 .vscode/
 CLAUDE.md
+
+# Brand fonts (ITF FFL): licensed to whoever downloads them, never redistributed. See #49.
+src/AraOverlay/fonts/
