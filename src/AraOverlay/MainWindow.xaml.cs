@@ -14,6 +14,7 @@ using Forms = System.Windows.Forms;
 
 using Application = System.Windows.Application;
 using Color = System.Windows.Media.Color;
+using TextBlock = System.Windows.Controls.TextBlock;
 
 namespace AraOverlay;
 
