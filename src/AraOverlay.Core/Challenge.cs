@@ -63,8 +63,8 @@ public sealed class Challenge
 
     /// <summary>Works out what a driver is aiming at next.</summary>
     /// <param name="held">The best medal they hold.</param>
-    /// <returns>The tier above it, or null once they hold gold.</returns>
-    public static Medal? NextTierAbove(Medal held) => held == Medal.Gold ? null : held + 1;
+    /// <returns>The tier above it; gold once they hold gold, so there is always a target.</returns>
+    public static Medal GoalFor(Medal held) => held == Medal.Gold ? Medal.Gold : held + 1;
 
     /// <summary>Checks one row is usable, so a typo fails at load rather than mid-session.</summary>
     /// <exception cref="InvalidDataException">No track ids, or times out of order.</exception>

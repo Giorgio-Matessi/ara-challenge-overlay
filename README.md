@@ -26,10 +26,9 @@ On a challenge's track and car, the panel reads top to bottom:
 | Row | |
 |---|---|
 | **Category · number** | Which challenge you've loaded, e.g. `ACADEMY CHALLENGES · 3`. Wet sessions are marked. |
-| **Goal / est. lap** | The tier you're chasing next and its target, against a live projection of the lap you're on. Once the lap is spoiled this cell says what spoiled it instead. |
-| **The big number** | How far your last lap sat from the goal. Red and `▼` means there's still time to find; green and `▲` means you cleared it. |
-| **Last lap / session best** | Your last completed lap, and the quickest clean one this session. |
-| **Gold / silver / bronze** | All three targets, with a ✓ on every medal you already hold. |
+| **The big number** | How far you are from the medal you're chasing. While the lap is clean it's live, projected from iRacing's running delta to your best lap. Red and `▼` means there's still time to find; green and `▲` means you're on pace to clear it. On your first lap, before there's a best lap to project from, it shows your last lap's gap instead. If the lap gets spoiled, it says what spoiled it. |
+| **Gold / silver / bronze** | All three targets. The one you're chasing is drawn larger and marked **GOAL**; the ones you already hold are faded and ticked ✓. |
+| **Last · best** | Your last completed lap and the quickest clean one this session, in small print. |
 
 
 Your best time and best medal per challenge live in

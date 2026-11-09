@@ -168,7 +168,10 @@ public sealed class SdkService : IDisposable
         }
     }
 
-    /// <summary>Projects the lap in progress, from iRacing's delta to its own session best.</summary>
+    /// <summary>
+    /// Projects the lap in progress from iRacing's running delta to the player's own best lap.
+    /// Not the session-best delta: that one is measured against whoever is fastest.
+    /// </summary>
     /// <returns>The projected lap time, or null with no usable reference lap.</returns>
     private double? EstimateLap()
     {
@@ -176,12 +179,12 @@ public sealed class SdkService : IDisposable
         // here would otherwise cost the whole frame, not just the estimate.
         try
         {
-            if (!_sdk.Data.GetBool("LapDeltaToSessionBestLap_OK")) return null;
+            if (!_sdk.Data.GetBool("LapDeltaToBestLap_OK")) return null;
 
             var reference = _sdk.Data.GetFloat("LapBestLapTime");
             if (reference <= 0) return null;
 
-            var estimate = reference + _sdk.Data.GetFloat("LapDeltaToSessionBestLap");
+            var estimate = reference + _sdk.Data.GetFloat("LapDeltaToBestLap");
             return estimate > 0 ? estimate : null;
         }
         catch (Exception e)
