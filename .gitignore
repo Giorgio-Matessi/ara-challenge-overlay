@@ -9,3 +9,7 @@ CLAUDE.md
 
 # Brand fonts (ITF FFL): licensed to whoever downloads them, never redistributed. See #49.
 src/AraOverlay/fonts/
+
+# Impeccable context: PRODUCT.md quotes the partner-only ARA brand guide. See #51.
+PRODUCT.md
+.impeccable/
