@@ -7,7 +7,7 @@ using IRSDKSharper;
 namespace AraOverlay;
 
 /// <summary>The lap in progress, as the panel needs it.</summary>
-public readonly record struct LiveLap(double CurrentSeconds, double? EstimatedSeconds, bool Clean, string Reason);
+public readonly record struct LiveLap(double? EstimatedSeconds, bool Clean, string Reason);
 
 /// <summary>
 /// The only place that touches the iRacing SDK. Translates its callbacks into plain events and
@@ -22,7 +22,7 @@ public sealed class SdkService : IDisposable
     private readonly IRacingSdk _sdk = new();
     private readonly LapTracker _tracker = new();
     private readonly ConditionTracker _conditions = new();
-    private ChallengeCatalog _catalog = ChallengeCatalog.Embedded;
+    private ChallengeCatalog _catalog = new([]);
     private ChallengeCatalog? _staged;
 
     private static readonly TimeSpan RestartDelay = TimeSpan.FromSeconds(2);
@@ -37,6 +37,7 @@ public sealed class SdkService : IDisposable
     public string TrackName { get; private set; } = "";
     public string CarName { get; private set; } = "";
     public bool IsWet => _conditions.IsWet;
+    public bool HasChallenges => _catalog.Challenges.Count > 0;
     public double? SessionBest => _tracker.SessionBestSeconds;
     /// <summary>Every challenge this track and car could be, one per plan.</summary>
     public IReadOnlyList<Challenge> Matches { get; private set; } = [];
@@ -90,7 +91,7 @@ public sealed class SdkService : IDisposable
         });
     }
 
-    /// <summary>Appends to %APPDATA%\AraOverlay\errors.log, dropping repeats.</summary>
+    /// <summary>Logs an exception with its stack trace, dropping repeats.</summary>
     /// <param name="e">The exception to record.</param>
     private void Log(Exception e)
     {
@@ -98,14 +99,20 @@ public sealed class SdkService : IDisposable
         if (summary == _lastLogged) return;
         _lastLogged = summary;
 
+        Log($"{summary}{Environment.NewLine}{e.StackTrace}");
+    }
+
+    /// <summary>Appends a line to %APPDATA%\AraOverlay\errors.log. A failed write is dropped.</summary>
+    /// <param name="message">What to record.</param>
+    public static void Log(string message)
+    {
         try
         {
             var path = JsonFile.PathIn("errors.log");
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            File.AppendAllText(path,
-                $"{DateTime.Now:s}  {summary}{Environment.NewLine}{e.StackTrace}{Environment.NewLine}");
+            File.AppendAllText(path, $"{DateTime.Now:s}  {message}{Environment.NewLine}");
         }
-        catch (Exception logFailure) when (logFailure is IOException or UnauthorizedAccessException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
         }
     }
@@ -161,7 +168,10 @@ public sealed class SdkService : IDisposable
         }
     }
 
-    /// <summary>Projects the lap in progress, from iRacing's delta to its own session best.</summary>
+    /// <summary>
+    /// Projects the lap in progress from iRacing's running delta to the player's own best lap.
+    /// Not the session-best delta: that one is measured against whoever is fastest.
+    /// </summary>
     /// <returns>The projected lap time, or null with no usable reference lap.</returns>
     private double? EstimateLap()
     {
@@ -169,12 +179,12 @@ public sealed class SdkService : IDisposable
         // here would otherwise cost the whole frame, not just the estimate.
         try
         {
-            if (!_sdk.Data.GetBool("LapDeltaToSessionBestLap_OK")) return null;
+            if (!_sdk.Data.GetBool("LapDeltaToBestLap_OK")) return null;
 
             var reference = _sdk.Data.GetFloat("LapBestLapTime");
             if (reference <= 0) return null;
 
-            var estimate = reference + _sdk.Data.GetFloat("LapDeltaToSessionBestLap");
+            var estimate = reference + _sdk.Data.GetFloat("LapDeltaToBestLap");
             return estimate > 0 ? estimate : null;
         }
         catch (Exception e)
@@ -244,15 +254,12 @@ public sealed class SdkService : IDisposable
                 IncidentCount: _sdk.Data.GetInt("PlayerCarMyIncidentCount"),
                 OnPitRoad: _sdk.Data.GetBool("OnPitRoad"));
 
-            var currentLap = _sdk.Data.GetFloat("LapCurrentLapTime");
-
             if (_conditions.Update(_sdk.Data.GetInt("TrackWetness"), _sdk.Data.GetBool("WeatherDeclaredWet")))
                 Rematch();
 
             var completed = _tracker.Update(frame);
 
-            Tick?.Invoke(new LiveLap(
-                currentLap, EstimateLap(), _tracker.CurrentLapIsClean, _tracker.CurrentLapReason));
+            Tick?.Invoke(new LiveLap(EstimateLap(), _tracker.CurrentLapIsClean, _tracker.CurrentLapReason));
             if (completed is { } lap) LapFinished?.Invoke(lap);
         }
         catch (Exception e)

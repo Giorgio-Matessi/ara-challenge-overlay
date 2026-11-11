@@ -14,6 +14,15 @@ public sealed record CatalogFetch(
     /// <summary>Whether this refresh produced a catalog worth keeping.</summary>
     public bool Usable => Error is null && Challenges.Count > 0;
 
+    /// <summary>The member's Garage61 bests across every plan; null if not asked for or any plan's failed.</summary>
+    public IReadOnlyList<ServerBest>? Bests { get; init; }
+
+    /// <summary>Why bests are missing when Garage61 isn't linked, as a line for the member.</summary>
+    public string? LinkHint { get; init; }
+
+    /// <summary>The https page that links Garage61, when the server gave one.</summary>
+    public string? LinkUrl { get; init; }
+
     /// <summary>Builds a failed refresh.</summary>
     /// <param name="error">What went wrong.</param>
     /// <returns>A result carrying nothing but the reason.</returns>
@@ -35,17 +44,21 @@ public static class CatalogFetcher
     /// <summary>Fetches the whole catalog.</summary>
     /// <param name="api">The Labs client.</param>
     /// <param name="token">The ARA bearer token.</param>
+    /// <param name="withBests">Also read the member's Garage61 bests for every plan.</param>
     /// <param name="cancel">Cancels the refresh.</param>
     /// <returns>The challenges, or a reason the refresh failed.</returns>
-    public static async Task<CatalogFetch> Fetch(ApiClient api, string token, CancellationToken cancel = default)
+    public static async Task<CatalogFetch> Fetch(ApiClient api, string token, bool withBests = false, CancellationToken cancel = default)
     {
         var challenges = new List<Challenge>();
         var skipped = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var bests = withBests ? new List<ServerBest>() : null;
+        (string Hint, string? Url)? link = null;
 
         try
         {
             if (await PlanIds(api, token, cancel).ConfigureAwait(false) is not { } plans)
-                return CatalogFetch.Failed(await Status(api, token, cancel).ConfigureAwait(false));
+                return CatalogFetch.Failed(Describe((await api.GetSession(token, cancel).ConfigureAwait(false)).Status));
 
             foreach (var planId in plans)
             {
@@ -53,8 +66,23 @@ public static class CatalogFetcher
                 if (!response.Ok) return CatalogFetch.Failed(Describe(response.Status));
 
                 var read = ApiCatalog.FromPlanDetail(response.Body);
-                challenges.AddRange(read.Challenges);
                 skipped.AddRange(read.Skipped);
+
+                // A plan set holds regular and weekly challenges, and the same one can appear in
+                // more than one plan; a second copy of a content id is that, not a second challenge.
+                foreach (var challenge in read.Challenges)
+                    if (seen.Add(challenge.ContentId)) challenges.Add(challenge);
+                    else skipped.Add($"Challenge {challenge.ContentId} appears in more than one plan; keeping the first.");
+
+                if (bests is null) continue;
+
+                // All or nothing: the merge is server-wins, so half a set would seed once and stick.
+                var (found, conflict) = await Bests(api, token, planId, cancel).ConfigureAwait(false);
+                if (found is not null) { bests.AddRange(found); continue; }
+
+                bests = null;
+                link = conflict;
+                if (conflict is null) skipped.Add("Personal bests could not be read from the Academy; keeping local progress.");
             }
         }
         catch (Exception e) when (e is InvalidDataException or JsonException)
@@ -66,64 +94,29 @@ public static class CatalogFetcher
             return CatalogFetch.Failed("The Academy could not be reached.");
         }
 
-        return new CatalogFetch(Distinct(challenges, skipped), skipped, null);
+        return new CatalogFetch(challenges, skipped, null) { Bests = bests, LinkHint = link?.Hint, LinkUrl = link?.Url };
     }
 
-    /// <summary>
-    /// Drops challenges the lookup could not tell apart, reporting each one.
-    ///
-    /// A plan set holds regular and weekly challenges, and the same challenge can appear in more
-    /// than one plan; a second copy of a content id is that, not a second challenge. Beyond that,
-    /// two different challenges sharing a track, a car and their targets grade a lap identically,
-    /// so keeping the first is harmless where rejecting the whole catalog would not be.
-    /// </summary>
-    /// <param name="challenges">Everything read, in plan order.</param>
-    /// <param name="skipped">Where to record what was dropped and why.</param>
-    /// <returns>The challenges the catalog can index.</returns>
-    private static List<Challenge> Distinct(List<Challenge> challenges, List<string> skipped)
+    /// <summary>Reads one plan's bests. Never throws: bests must not cost the catalog.</summary>
+    /// <param name="api">The Labs client.</param>
+    /// <param name="token">The ARA bearer token.</param>
+    /// <param name="planId">The plan to read.</param>
+    /// <param name="cancel">Cancels the refresh.</param>
+    /// <returns>The bests, or null with the 409's hint when Garage61 isn't linked.</returns>
+    private static async Task<(List<ServerBest>? Bests, (string Hint, string? Url)? Link)> Bests(
+        ApiClient api, string token, string planId, CancellationToken cancel)
     {
-        var kept = new List<Challenge>();
-        var seenContent = new HashSet<string>(StringComparer.Ordinal);
-        var byCombination = new Dictionary<(int Track, int Car), List<Challenge>>();
-
-        foreach (var challenge in challenges)
+        try
         {
-            if (!seenContent.Add(challenge.ContentId))
-            {
-                skipped.Add($"Challenge {challenge.ContentId} appears in more than one plan; keeping the first.");
-                continue;
-            }
+            var response = await api.GetResults(token, planId, cancel).ConfigureAwait(false);
 
-            // Only within the same plan. Two plans using the same circuit and car are two real
-            // challenges a driver could be attempting, and the lookup offers both rather than
-            // picking one on their behalf.
-            var twin = challenge.TrackIds
-                .Select(track => byCombination.GetValueOrDefault((track, challenge.CarId)))
-                .OfType<List<Challenge>>()
-                .SelectMany(sharing => sharing)
-                .FirstOrDefault(other =>
-                    string.Equals(other.Plan, challenge.Plan, StringComparison.Ordinal) &&
-                    Math.Abs(other.BronzeSeconds - challenge.BronzeSeconds) < 0.001);
-
-            if (twin is not null)
-            {
-                skipped.Add(
-                    $"Challenges {twin.ContentId} and {challenge.ContentId} share track " +
-                    $"{challenge.TrackIds[0]}, car {challenge.CarId} and their targets; keeping the first.");
-                continue;
-            }
-
-            foreach (var track in challenge.TrackIds)
-            {
-                if (!byCombination.TryGetValue((track, challenge.CarId), out var sharing))
-                    byCombination[(track, challenge.CarId)] = sharing = [];
-                sharing.Add(challenge);
-            }
-
-            kept.Add(challenge);
+            if (response.Status == 409) return (null, ServerResults.LinkHint(response.Body));
+            return (response.Ok ? ServerResults.Parse(response.Body) : null, null);
         }
-
-        return kept;
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException && !cancel.IsCancellationRequested)
+        {
+            return (null, null);
+        }
     }
 
     /// <summary>Lists every plan id, following pagination to the end.</summary>
@@ -169,17 +162,6 @@ public static class CatalogFetcher
         }
 
         return ids;
-    }
-
-    /// <summary>Asks why a listing failed, so the member is told the actual reason.</summary>
-    /// <param name="api">The Labs client.</param>
-    /// <param name="token">The ARA bearer token.</param>
-    /// <param name="cancel">Cancels the request.</param>
-    /// <returns>A line for the panel.</returns>
-    private static async Task<string> Status(ApiClient api, string token, CancellationToken cancel)
-    {
-        var session = await api.GetSession(token, cancel).ConfigureAwait(false);
-        return Describe(session.Status);
     }
 
     /// <summary>Turns a status into something worth showing a driver.</summary>

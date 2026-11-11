@@ -67,8 +67,7 @@ public class ApiCatalogTests
         Assert.Equal(7, challenge.Number);
         Assert.Equal("01KCRX69FW10CR0M7NYXX1CA2H", challenge.ContentId);
         Assert.Equal("01KCRX69FW10CR0M7NYXX1CA2H", challenge.Key);
-        Assert.Equal("Example circuit", challenge.Track);
-        Assert.Equal("Example car", challenge.Car);
+        Assert.Equal("ARA", challenge.Plan);
         Assert.Equal(107.5, challenge.GoldSeconds, 3);
         Assert.Equal(108.0, challenge.SilverSeconds, 3);
         Assert.Equal(108.5, challenge.BronzeSeconds, 3);
@@ -154,7 +153,6 @@ public class ApiCatalogTests
         var challenges = Read(twoCars).Challenges;
 
         Assert.Equal([67, 68], challenges.Select(c => c.CarId));
-        Assert.Equal(["A", "B"], challenges.Select(c => c.Car));
         Assert.All(challenges, c => Assert.Equal("01KCRX69FW10CR0M7NYXX1CA2H", c.ContentId));
     }
 
@@ -238,7 +236,7 @@ public class ApiCatalogTests
     public void AMappedPlanFeedsTheCatalogStraightBack()
     {
         // The whole point: what comes off the API has to match the same way the embedded rows do.
-        var catalog = ChallengeCatalog.FromChallenges(Read(Item()).Challenges);
+        var catalog = new ChallengeCatalog(Read(Item()).Challenges);
 
         Assert.Equal(7, Assert.Single(catalog.Find(166, 67, wet: false)).Number);
         Assert.Empty(catalog.Find(166, 999, wet: false));

@@ -47,6 +47,24 @@ public sealed class ProgressStore
         return updated.BestMedal > heldMedal;
     }
 
+    /// <summary>Seeds stored progress from the member's Garage61 bests. Server wins at startup.</summary>
+    /// <param name="bests">The server's bests; challenges it doesn't mention are left alone.</param>
+    public void MergeFromServer(IEnumerable<ServerBest> bests)
+    {
+        var changed = false;
+
+        foreach (var best in bests)
+        {
+            var record = new ChallengeProgress(best.Seconds, best.Medal);
+            if (Get(best.ContentId) == record) continue;
+
+            _progress[best.ContentId] = record;
+            changed = true;
+        }
+
+        if (changed) Save();
+    }
+
     /// <summary>Writes the store to disk. A failed write is dropped.</summary>
     private void Save() => JsonFile.Save(_path, _progress);
 }

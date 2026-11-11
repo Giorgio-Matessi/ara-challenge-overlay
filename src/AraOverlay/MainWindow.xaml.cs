@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Globalization;
 using System.IO;
 using System.Media;
 using System.Reflection;
@@ -15,6 +14,7 @@ using Forms = System.Windows.Forms;
 
 using Application = System.Windows.Application;
 using Color = System.Windows.Media.Color;
+using TextBlock = System.Windows.Controls.TextBlock;
 
 namespace AraOverlay;
 
@@ -45,7 +45,7 @@ public partial class MainWindow : Window
     private readonly Settings _settings = Settings.Load();
     private readonly ProgressStore _progress = new(JsonFile.PathIn("progress.json"));
     private readonly SdkService _sdk = new();
-    private readonly DispatcherTimer _bannerTimer = new() { Interval = TimeSpan.FromSeconds(8) };
+    private readonly DispatcherTimer _bannerTimer = new() { Interval = TimeSpan.FromSeconds(3) };
     private readonly DispatcherTimer _loginTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly ApiClient _api = new();
     private readonly DispatcherTimer _refreshTimer = new() { Interval = TimeSpan.FromMinutes(15) };
@@ -59,9 +59,14 @@ public partial class MainWindow : Window
     private LoginStatus _loginStatus = LoginStatus.Idle;
     private DateTimeOffset _loginSettled;
     private bool _refreshing;
+    private bool _seeded;
+    private bool _linkHintShown;
+    private string? _linkUrl;
     private IntPtr _hwnd;
     private bool _hotkeyClaimed;
     private double? _lastLap;
+    private Medal _goal = Medal.Gold;
+    private double _goalTarget;
     private bool _demo;
 
     /// <summary>Restores the saved position and marshals the SDK's events onto the UI thread.</summary>
@@ -87,8 +92,8 @@ public partial class MainWindow : Window
     {
         base.OnSourceInitialized(e);
         _hwnd = new WindowInteropHelper(this).Handle;
-        ApplyWindowStyles();
         ClaimLockHotkey();
+        ApplyWindowStyles();
         BuildTrayIcon();
 
         if (Environment.GetCommandLineArgs().Contains("--demo"))
@@ -104,7 +109,11 @@ public partial class MainWindow : Window
         RefreshCatalog();
     }
 
-    /// <summary>Sets click-through for the current lock state and colours the panel border.</summary>
+    /// <summary>
+    /// Sets click-through for the current lock state, outlines the panel in Ink while unlocked
+    /// (Gold already means the gold medal), and shows how to move and lock it. Needs the hotkey
+    /// claimed first, so the hint only names Ctrl+Alt+L when it works.
+    /// </summary>
     private void ApplyWindowStyles()
     {
         var style = GetWindowLong(_hwnd, GWL_EXSTYLE) | WS_EX_TOOLWINDOW;
@@ -116,7 +125,12 @@ public partial class MainWindow : Window
 
         Panel.BorderBrush = _settings.Locked
             ? new SolidColorBrush(Color.FromArgb(0x20, 0xFF, 0xFF, 0xFF))
-            : new SolidColorBrush(Color.FromArgb(0xFF, 0x4C, 0xC2, 0xFF));
+            : (SolidColorBrush)FindResource("Ink");
+
+        LockHint.Text = WaitingHint.Text = _hotkeyClaimed
+            ? "DRAG TO MOVE  ·  CTRL+ALT+L TO LOCK"
+            : "DRAG TO MOVE  ·  LOCK FROM THE TRAY";
+        LockHint.Visibility = WaitingHint.Visibility = _settings.Locked ? Visibility.Collapsed : Visibility.Visible;
     }
 
     /// <summary>
@@ -212,6 +226,8 @@ public partial class MainWindow : Window
             Visible = true,
             ContextMenuStrip = menu,
         };
+
+        _tray.BalloonTipClicked += (_, _) => { if (_linkUrl is not null) OpenBrowser(_linkUrl); };
     }
 
     /// <summary>How long a finished login's message stays up before the panel moves on.</summary>
@@ -219,18 +235,18 @@ public partial class MainWindow : Window
 
     private static readonly Medal[] DemoTiers = [Medal.None, Medal.Bronze, Medal.Silver, Medal.Gold];
 
-    /// <summary>Invents a lap time for the demo.</summary>
-    /// <param name="challenge">The challenge being shown.</param>
-    /// <param name="medal">The tier the lap should earn.</param>
-    /// <returns>A time just inside that tier's threshold.</returns>
-    private static double DemoLap(Challenge challenge, Medal medal) => challenge.TargetFor(medal) - 0.05;
+    private static readonly Challenge[] DemoChallenges =
+    [
+        new() { Plan = "Academy Challenges", Number = 1, TrackIds = [1], Gold = "0:49.299", Silver = "0:49.599", Bronze = "0:49.899" },
+        new() { Plan = "Academy Challenges", Number = 14, TrackIds = [1], Gold = "3:36.250", Silver = "3:37.000", Bronze = "3:38.800" },
+        new() { Plan = "Weekly Challenges", Number = 2, TrackIds = [1], Gold = "1:06.100", Silver = "1:06.600", Bronze = "1:07.100" },
+        new() { Plan = "Weekly Challenges", Number = 12, TrackIds = [1], Gold = "1:44.000", Silver = "1:44.700", Bronze = "1:45.500" },
+    ];
 
     /// <summary>Cycles every challenge and medal state with no sim attached, for --demo.</summary>
     private void StartDemo()
     {
         _demo = true;
-
-        var challenges = ChallengeCatalog.Embedded.Challenges.OrderBy(c => c.Number).ToList();
 
         // Opens on the waiting art, then an unmatched session, then the challenge cycle.
         var step = -1;
@@ -246,14 +262,14 @@ public partial class MainWindow : Window
             {
                 step++;
                 HideBanner();
-                ShowUnmatched("track  0  \ncar    0  \ncond   dry");
+                ShowUnmatched(NoChallengeTitle, "track  0  \ncar    0  \ncond   dry");
                 return;
             }
 
-            var index = step / 2 % challenges.Count;
-            var challenge = challenges[index];
+            var index = step / 2 % DemoChallenges.Length;
+            var challenge = DemoChallenges[index];
             var medal = DemoTiers[index % DemoTiers.Length];
-            var lap = medal == Medal.None ? challenge.BronzeSeconds + 1.234 : DemoLap(challenge, medal);
+            var lap = medal == Medal.None ? challenge.BronzeSeconds + 1.234 : challenge.TargetFor(medal) - 0.05;
 
             if (step % 2 == 0)
             {
@@ -262,12 +278,16 @@ public partial class MainWindow : Window
                 _lastLap = lap;
                 ShowChallenge(challenge, medal);
 
-                SessionBestText.Text = TimeFormat.Format(lap - 0.35);
-                EstLapText.Text = TimeFormat.Format(lap + 0.12);
+                ShowFooter(TimeFormat.Format(lap), lap - 0.35);
+                ShowDelta(new LiveLap(_goalTarget + (index % 2 == 0 ? -0.214 : 0.386), true, ""));
             }
             else if (medal != Medal.None)
             {
                 ShowBanner(medal, lap, challenge);
+            }
+            else
+            {
+                ShowDelta(new LiveLap(null, false, "off track"));
             }
 
             step++;
@@ -323,7 +343,8 @@ public partial class MainWindow : Window
         }
         else
         {
-            ShowUnmatched($"track  {_sdk.TrackId}  {_sdk.TrackName}\n" +
+            ShowUnmatched(_sdk.HasChallenges ? NoChallengeTitle : "SIGN IN FROM THE TRAY TO LOAD CHALLENGES",
+                          $"track  {_sdk.TrackId}  {_sdk.TrackName}\n" +
                           $"car    {_sdk.CarId}  {_sdk.CarName}\n" +
                           $"cond   {(_sdk.IsWet ? "wet" : "dry")}");
         }
@@ -387,13 +408,13 @@ public partial class MainWindow : Window
 
             try
             {
-                fetched = await CatalogFetcher.Fetch(_api, stored.Token).ConfigureAwait(false);
+                fetched = await CatalogFetcher.Fetch(_api, stored.Token, withBests: !_seeded).ConfigureAwait(false);
             }
             catch (Exception e)
             {
                 // Anything the fetcher didn't expect. Losing the flag here would stop every later
                 // refresh for the rest of the session, silently.
-                await Dispatcher.InvokeAsync(() => { _refreshing = false; Log($"{e.GetType().Name}: {e.Message}"); });
+                await Dispatcher.InvokeAsync(() => { _refreshing = false; SdkService.Log($"{e.GetType().Name}: {e.Message}"); });
                 return;
             }
 
@@ -401,11 +422,21 @@ public partial class MainWindow : Window
             {
                 _refreshing = false;
 
-                if (fetched.Skipped.Count > 0) Log(string.Join(Environment.NewLine, fetched.Skipped));
+                if (fetched.Skipped.Count > 0) SdkService.Log(string.Join(Environment.NewLine, fetched.Skipped));
+
+                // Once per sign-in: later refreshes would overwrite laps Garage61 hasn't processed yet.
+                if (fetched.Bests is { } bests && !_seeded)
+                {
+                    _progress.MergeFromServer(bests);
+                    _seeded = true;
+                    RenderState();
+                }
+
+                if (fetched.LinkHint is { } hint) ShowLinkHint(hint, fetched.LinkUrl);
 
                 if (!fetched.Usable)
                 {
-                    if (fetched.Error is { } error) Log(error);
+                    if (fetched.Error is { } error) SdkService.Log(error);
                     return;
                 }
 
@@ -413,7 +444,8 @@ public partial class MainWindow : Window
                 {
                     // Built before it is cached: a catalog the lookup rejects must not replace a
                     // good file on disk.
-                    var catalog = ChallengeCatalog.FromChallenges(fetched.Challenges);
+                    var catalog = new ChallengeCatalog(fetched.Challenges);
+                    if (catalog.Skipped.Count > 0) SdkService.Log(string.Join(Environment.NewLine, catalog.Skipped));
 
                     CatalogCache.Save(fetched.Challenges);
                     _sdk.SwapCatalog(catalog);
@@ -422,25 +454,10 @@ public partial class MainWindow : Window
                 {
                     // Two challenges the overlay could not tell apart. Keeping the old catalog is
                     // the only safe answer; the log is how this gets reported to ARA.
-                    Log(e.Message);
+                    SdkService.Log(e.Message);
                 }
             });
         });
-    }
-
-    /// <summary>Appends a line to %APPDATA%\AraOverlay\errors.log, the same file the SDK uses.</summary>
-    /// <param name="message">What to record.</param>
-    private static void Log(string message)
-    {
-        try
-        {
-            var path = JsonFile.PathIn("errors.log");
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            File.AppendAllText(path, $"{DateTime.Now:s}  {message}{Environment.NewLine}");
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-        }
     }
 
     /// <summary>Revokes the session with the server, then forgets it locally either way.</summary>
@@ -450,7 +467,21 @@ public partial class MainWindow : Window
             _ = Task.Run(() => _api.RevokeSession(stored.Token));
 
         TokenStore.Clear();
+        _seeded = false;
         UpdateSignInItem();
+    }
+
+    /// <summary>Tells the member, once per run, why medals are local-only; clicking opens the link page.</summary>
+    /// <param name="hint">The one-line reason.</param>
+    /// <param name="url">The https page that fixes it, if any.</param>
+    private void ShowLinkHint(string hint, string? url)
+    {
+        SdkService.Log(hint);
+        if (_linkHintShown || _tray is null) return;
+
+        _linkHintShown = true;
+        _linkUrl = url;
+        _tray.ShowBalloonTip(10_000, "Medals on this PC only", url is null ? hint : $"{hint} Click to open the Academy.", Forms.ToolTipIcon.Info);
     }
 
     /// <summary>Stops a login in progress and clears the panel.</summary>
@@ -561,25 +592,26 @@ public partial class MainWindow : Window
 
     private enum PanelMode { Challenge, Unmatched, SigningIn }
 
-    /// <summary>Swaps between the challenge rows, the id listing, and the login code.</summary>
+    /// <summary>Swaps between the challenge rows, the id listing, and the login code; WET shows only on a wet challenge.</summary>
     /// <param name="mode">Which of the three the panel is showing.</param>
     private void SetPanelMode(PanelMode mode)
     {
         var rows = mode == PanelMode.Challenge ? Visibility.Visible : Visibility.Collapsed;
 
-        TrackText.Visibility = CarText.Visibility = rows;
-        HeaderDivider1.Visibility = HeaderDivider2.Visibility = rows;
-        GoalRow.Visibility = DeltaRow.Visibility = rows;
-        LapRow.Visibility = Targets.Visibility = rows;
+        DeltaRow.Visibility = Medals.Visibility = FooterText.Visibility = rows;
+        WetMark.Visibility = mode == PanelMode.Challenge && _sdk.IsWet ? Visibility.Visible : Visibility.Collapsed;
         StatusText.Visibility = mode == PanelMode.Unmatched ? Visibility.Visible : Visibility.Collapsed;
         Login.Visibility = mode == PanelMode.SigningIn ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    private const string NoChallengeTitle = "NO ARA CHALLENGE FOR THIS COMBINATION";
+
     /// <summary>Shows the ids the sim reported, for a track and car matching no challenge.</summary>
+    /// <param name="title">Why nothing matched.</param>
     /// <param name="detail">The lines to print under the title.</param>
-    private void ShowUnmatched(string detail)
+    private void ShowUnmatched(string title, string detail)
     {
-        TitleText.Text = "NO ARA CHALLENGE FOR THIS COMBINATION";
+        TitleText.Text = title;
         SetPanelMode(PanelMode.Unmatched);
         StatusText.Text = detail;
     }
@@ -590,10 +622,8 @@ public partial class MainWindow : Window
     private void ShowChallenge(Challenge challenge, Medal? held = null)
     {
         TitleText.Text = challenge.Plan.Length > 0
-            ? $"{challenge.Plan.ToUpperInvariant()}  ·  {challenge.Number}{(_sdk.IsWet ? "  ·  WET" : "")}"
-            : $"CHALLENGE {challenge.Number}{(_sdk.IsWet ? "  ·  WET" : "")}";
-        TrackText.Text = challenge.Track.ToUpperInvariant();
-        CarText.Text = challenge.Car.ToUpperInvariant();
+            ? $"{challenge.Plan.ToUpperInvariant()}  ·  {challenge.Number}"
+            : $"CHALLENGE {challenge.Number}";
 
         SetPanelMode(PanelMode.Challenge);
 
@@ -623,7 +653,7 @@ public partial class MainWindow : Window
             var index = i;
 
             _matchItem.DropDownItems.Add(new Forms.ToolStripMenuItem(
-                match.Plan.Length > 0 ? $"{match.Plan} — {match.Number}" : $"Challenge {match.Number}",
+                match.Plan.Length > 0 ? $"{match.Plan}  ·  {match.Number}" : $"Challenge {match.Number}",
                 null,
                 (_, _) => _sdk.SelectMatch(index))
             {
@@ -638,63 +668,80 @@ public partial class MainWindow : Window
     private Medal HeldMedal(Challenge challenge) => _progress.Get(challenge.Key)?.BestMedal ?? Medal.None;
 
     /// <summary>
-    /// Refills the rows that move as laps come in: the held ticks, the goal tier, the big delta
-    /// from the last lap to that tier's target, and the two lap times. Once gold is held the goal
-    /// stays gold, so the delta keeps meaning something.
+    /// Refills everything that moves as laps come in: the goal, the three medal rows, the footer,
+    /// and the delta as of the last lap. Once gold is held the goal stays gold, so the delta keeps
+    /// meaning something.
     /// </summary>
     /// <param name="challenge">The challenge being shown.</param>
     /// <param name="medal">The medal to treat as held.</param>
     private void UpdateLiveRows(Challenge challenge, Medal medal)
     {
-        GoldMark.Text = medal >= Medal.Gold ? "✓" : "";
-        SilverMark.Text = medal >= Medal.Silver ? "✓" : "";
-        BronzeMark.Text = medal >= Medal.Bronze ? "✓" : "";
+        _goal = Challenge.GoalFor(medal);
+        _goalTarget = challenge.TargetFor(_goal);
 
-        var goal = Challenge.NextTierAbove(medal) ?? Medal.Gold;
-        var target = challenge.TargetFor(goal);
+        foreach (var tier in new[] { Medal.Gold, Medal.Silver, Medal.Bronze })
+            ShowTier(tier, medal);
 
-        GoalTier.Text = goal.ToString().ToUpperInvariant();
-        GoalTier.Foreground = (SolidColorBrush)FindResource(goal.ToString());
-        GoalTime.Text = TimeFormat.Format(target);
-
-        SessionBestText.Text = _sdk.SessionBest is { } best ? TimeFormat.Format(best) : "—";
-
-        if (_lastLap is not { } lap)
-        {
-            LastLapText.Text = "—";
-            DeltaText.Text = "—";
-            DeltaText.Foreground = (SolidColorBrush)FindResource("Dim");
-            return;
-        }
-
-        LastLapText.Text = TimeFormat.Format(lap);
-
-        var delta = lap - target;
-        var behind = delta > 0;
-
-        DeltaText.Text = delta.ToString("+0.000;-0.000", CultureInfo.InvariantCulture) + (behind ? "s ▼" : "s ▲");
-        DeltaText.Foreground = (SolidColorBrush)FindResource(behind ? "Behind" : "Ahead");
+        ShowFooter(_lastLap is { } lap ? TimeFormat.Format(lap) : "—", _sdk.SessionBest);
+        ShowDelta(null);
     }
 
+    /// <summary>Draws one medal row: enlarged and marked GOAL if chased, greyed and ticked if held.</summary>
+    /// <param name="tier">Which row.</param>
+    /// <param name="held">The best medal held.</param>
+    private void ShowTier(Medal tier, Medal held)
+    {
+        var isGoal = tier == _goal;
+        var isHeld = held >= tier;
+
+        var ink = (SolidColorBrush)FindResource(isHeld && !isGoal ? "Dim" : tier.ToString());
+        foreach (var part in new[] { "Label", "Time", "Mark" }) ((TextBlock)FindName($"{tier}{part}")).Foreground = ink;
+        ((TextBlock)FindName($"{tier}Label")).FontSize = isGoal ? 13 : 11;
+        ((TextBlock)FindName($"{tier}Time")).FontSize = isGoal ? 17 : 13;
+        ((TextBlock)FindName($"{tier}Mark")).Text = isGoal ? (isHeld ? "✓  GOAL" : "GOAL") : isHeld ? "✓" : "";
+    }
+
+    /// <summary>Fills the quiet line under the medals.</summary>
+    /// <param name="last">The last lap, already formatted, since an invalid one carries a suffix.</param>
+    /// <param name="best">The session best, if any.</param>
+    private void ShowFooter(string last, double? best) =>
+        FooterText.Text = $"LAST {last}   ·   BEST {(best is { } b ? TimeFormat.Format(b) : "—")}";
+
     /// <summary>
-    /// Updates the estimated lap, which doubles as the warning line: a spoiled lap shows what
-    /// spoiled it instead of a projection it can no longer earn. Called per frame, so it only
-    /// writes on change.
+    /// Draws the big number: the projected gap to the goal while the lap is clean, what spoiled it
+    /// if it isn't, and the last lap's gap until iRacing has a projection. Called per frame, so it
+    /// only writes on change.
     /// </summary>
+    /// <param name="live">The lap in progress, or null to show the last lap's gap.</param>
+    private void ShowDelta(LiveLap? live)
+    {
+        var tier = _goal.ToString().ToUpperInvariant();
+
+        var (text, caption, brush) =
+            live is { Clean: false } spoiled ? (spoiled.Reason.ToUpperInvariant(), "LAP INVALID", "Behind")
+            : live?.EstimatedSeconds is { } estimate ? Gap(estimate, $"TO {tier}  ·  LIVE")
+            : _lastLap is { } lap ? Gap(lap, $"TO {tier}  ·  LAST LAP")
+            : ("—", $"TO {tier}", "Dim");
+
+        if (DeltaText.Text == text && DeltaCaption.Text == caption) return;
+
+        DeltaText.Text = text;
+        DeltaCaption.Text = caption;
+        DeltaText.Foreground = (SolidColorBrush)FindResource(brush);
+
+        (string, string, string) Gap(double seconds, string label)
+        {
+            var delta = seconds - _goalTarget;
+            return (TimeFormat.Delta(delta) + "s", label, delta > 0 ? "Behind" : "Ahead");
+        }
+    }
+
+    /// <summary>Hands the lap in progress to the big number.</summary>
     /// <param name="live">The lap in progress.</param>
     private void OnTick(LiveLap live)
     {
         if (_sdk.Challenge is null) return;
-
-        var text = live.Clean
-            ? live.EstimatedSeconds is { } estimate ? TimeFormat.Format(estimate) : "—"
-            : $"! {live.Reason}";
-
-        if (EstLapText.Text != text)
-        {
-            EstLapText.Text = text;
-            EstLapText.Foreground = (SolidColorBrush)FindResource(live.Clean ? "Ink" : "Behind");
-        }
+        ShowDelta(live);
     }
 
     /// <summary>Records a finished lap and pops the banner if it earned a new tier.</summary>
@@ -705,7 +752,8 @@ public partial class MainWindow : Window
 
         if (lap.Outcome == LapOutcome.Invalidated)
         {
-            LastLapText.Text = $"{TimeFormat.Format(lap.Seconds)}  INVALID";
+            var why = string.IsNullOrEmpty(lap.Reason) ? "" : $" · {lap.Reason.ToUpperInvariant()}";
+            ShowFooter($"{TimeFormat.Format(lap.Seconds)} INVALID{why}", _sdk.SessionBest);
             return;
         }
 
@@ -746,7 +794,7 @@ public partial class MainWindow : Window
     private Layer RestingLayer =>
         _demo || _sdk.Connected || SigningIn || _loginStatus.Message.Length > 0 ? Layer.Panel : Layer.Waiting;
 
-    /// <summary>Shows the medal banner in place of the panel, for eight seconds.</summary>
+    /// <summary>Shows the medal banner in place of the panel, for three seconds.</summary>
     /// <param name="medal">The medal earned; None shows nothing.</param>
     /// <param name="seconds">The lap time that earned it.</param>
     /// <param name="challenge">The challenge it was set on.</param>
@@ -758,7 +806,7 @@ public partial class MainWindow : Window
         BannerArt.Background = (ImageBrush)FindResource($"{medal}Art");
         Banner.BorderBrush = (SolidColorBrush)FindResource(medal.ToString());
         BannerTime.Text = TimeFormat.Format(seconds);
-        BannerSub.Text = $"Challenge {challenge.Number} — {challenge.Track}";
+        BannerSub.Text = challenge.Plan.Length > 0 ? $"{challenge.Plan}  ·  {challenge.Number}" : $"Challenge {challenge.Number}";
 
         ShowLayer(Layer.Medal);
 

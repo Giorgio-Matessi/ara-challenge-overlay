@@ -8,8 +8,6 @@ public class MedalTests
     private static readonly Challenge Sample = new()
     {
         Number = 1,
-        Track = "Test Track",
-        Car = "Test Car",
         TrackIds = [299],
         CarId = 142,
         Gold = "0:53.500",
@@ -65,11 +63,11 @@ public class MedalTests
     }
 
     [Fact]
-    public void NextTierAbove_WalksUpwardsAndStopsAtGold()
+    public void GoalFor_WalksUpwardsAndStaysOnGold()
     {
-        Assert.Equal(Medal.Bronze, Challenge.NextTierAbove(Medal.None));
-        Assert.Equal(Medal.Silver, Challenge.NextTierAbove(Medal.Bronze));
-        Assert.Equal(Medal.Gold, Challenge.NextTierAbove(Medal.Silver));
-        Assert.Null(Challenge.NextTierAbove(Medal.Gold));
+        Assert.Equal(Medal.Bronze, Challenge.GoalFor(Medal.None));
+        Assert.Equal(Medal.Silver, Challenge.GoalFor(Medal.Bronze));
+        Assert.Equal(Medal.Gold, Challenge.GoalFor(Medal.Silver));
+        Assert.Equal(Medal.Gold, Challenge.GoalFor(Medal.Gold));
     }
 }

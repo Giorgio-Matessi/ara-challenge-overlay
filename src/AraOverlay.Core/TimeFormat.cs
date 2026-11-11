@@ -2,7 +2,7 @@ using System.Globalization;
 
 namespace AraOverlay.Core;
 
-/// <summary>Converts lap times between seconds and the "M:SS.fff" strings used in challenges.json.</summary>
+/// <summary>Converts lap times between seconds and "M:SS.fff" strings.</summary>
 public static class TimeFormat
 {
     /// <summary>Parses a lap time.</summary>
@@ -43,4 +43,10 @@ public static class TimeFormat
         var rest = total - minutes * 60;
         return string.Format(CultureInfo.InvariantCulture, "{0}:{1:00.000}", minutes, rest);
     }
+
+    /// <summary>Renders a gap between two times.</summary>
+    /// <param name="seconds">The gap in seconds; negative is ahead.</param>
+    /// <returns>The gap as "+0.000" or "-0.000".</returns>
+    public static string Delta(double seconds) =>
+        seconds.ToString("+0.000;-0.000", CultureInfo.InvariantCulture);
 }

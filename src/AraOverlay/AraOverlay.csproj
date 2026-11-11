@@ -16,6 +16,12 @@
          PenImc) that PublishSingleFile leaves loose beside the exe unless this is set. -->
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+
+    <!-- Size. The bundled runtime is nearly all of the exe; compression roughly halves it at the
+         cost of unpacking in memory at launch. Trimming would do more but WPF doesn't support it.
+         The UI is English only, so the other languages' framework resources are dead weight. -->
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <DebugType>none</DebugType>
   </PropertyGroup>
 
