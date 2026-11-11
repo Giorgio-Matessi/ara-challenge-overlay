@@ -15,6 +15,58 @@ public class ProgressStoreTests : IDisposable
     }
 
     [Fact]
+    public void ServerBestsSurviveLosingTheFile()
+    {
+        new ProgressStore(Path_).MergeFromServer([new ServerBest("c1", 49.5, Medal.Silver)]);
+
+        Assert.Equal(new ChallengeProgress(49.5, Medal.Silver), new ProgressStore(Path_).Get("c1"));
+    }
+
+    [Fact]
+    public void TheServerWinsOverLocalProgress()
+    {
+        // Garage61 re-grades against the current targets, so its verdict replaces a stale one.
+        var store = new ProgressStore(Path_);
+        store.RecordLap("c1", 48.9, Medal.Gold);
+
+        store.MergeFromServer([new ServerBest("c1", 49.5, Medal.Silver)]);
+
+        Assert.Equal(new ChallengeProgress(49.5, Medal.Silver), store.Get("c1"));
+    }
+
+    [Fact]
+    public void AConfirmedNoMedalIsStillRecorded()
+    {
+        var store = new ProgressStore(Path_);
+        store.RecordLap("c1", 49.5, Medal.Bronze);
+
+        store.MergeFromServer([new ServerBest("c1", 51.0, Medal.None)]);
+
+        Assert.Equal(Medal.None, store.Get("c1")!.BestMedal);
+    }
+
+    [Fact]
+    public void ChallengesTheServerDidNotMentionAreLeftAlone()
+    {
+        var store = new ProgressStore(Path_);
+        store.RecordLap("c2", 49.5, Medal.Bronze);
+
+        store.MergeFromServer([new ServerBest("c1", 49.5, Medal.Silver)]);
+
+        Assert.Equal(Medal.Bronze, store.Get("c2")!.BestMedal);
+    }
+
+    [Fact]
+    public void ASeededMedalDoesNotPopAgain()
+    {
+        var store = new ProgressStore(Path_);
+        store.MergeFromServer([new ServerBest("c1", 49.5, Medal.Silver)]);
+
+        Assert.False(store.RecordLap("c1", 49.4, Medal.Silver));
+        Assert.True(store.RecordLap("c1", 49.0, Medal.Gold));
+    }
+
+    [Fact]
     public void FirstMedalIsWorthAPopup()
     {
         var store = new ProgressStore(Path_);

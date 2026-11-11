@@ -14,6 +14,15 @@ public sealed record CatalogFetch(
     /// <summary>Whether this refresh produced a catalog worth keeping.</summary>
     public bool Usable => Error is null && Challenges.Count > 0;
 
+    /// <summary>The member's Garage61 bests across every plan; null if not asked for or any plan's failed.</summary>
+    public IReadOnlyList<ServerBest>? Bests { get; init; }
+
+    /// <summary>Why bests are missing when Garage61 isn't linked, as a line for the member.</summary>
+    public string? LinkHint { get; init; }
+
+    /// <summary>The https page that links Garage61, when the server gave one.</summary>
+    public string? LinkUrl { get; init; }
+
     /// <summary>Builds a failed refresh.</summary>
     /// <param name="error">What went wrong.</param>
     /// <returns>A result carrying nothing but the reason.</returns>
@@ -35,13 +44,16 @@ public static class CatalogFetcher
     /// <summary>Fetches the whole catalog.</summary>
     /// <param name="api">The Labs client.</param>
     /// <param name="token">The ARA bearer token.</param>
+    /// <param name="withBests">Also read the member's Garage61 bests for every plan.</param>
     /// <param name="cancel">Cancels the refresh.</param>
     /// <returns>The challenges, or a reason the refresh failed.</returns>
-    public static async Task<CatalogFetch> Fetch(ApiClient api, string token, CancellationToken cancel = default)
+    public static async Task<CatalogFetch> Fetch(ApiClient api, string token, bool withBests = false, CancellationToken cancel = default)
     {
         var challenges = new List<Challenge>();
         var skipped = new List<string>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
+        var bests = withBests ? new List<ServerBest>() : null;
+        (string Hint, string? Url)? link = null;
 
         try
         {
@@ -61,6 +73,16 @@ public static class CatalogFetcher
                 foreach (var challenge in read.Challenges)
                     if (seen.Add(challenge.ContentId)) challenges.Add(challenge);
                     else skipped.Add($"Challenge {challenge.ContentId} appears in more than one plan; keeping the first.");
+
+                if (bests is null) continue;
+
+                // All or nothing: the merge is server-wins, so half a set would seed once and stick.
+                var (found, conflict) = await Bests(api, token, planId, cancel).ConfigureAwait(false);
+                if (found is not null) { bests.AddRange(found); continue; }
+
+                bests = null;
+                link = conflict;
+                if (conflict is null) skipped.Add("Personal bests could not be read from the Academy; keeping local progress.");
             }
         }
         catch (Exception e) when (e is InvalidDataException or JsonException)
@@ -72,7 +94,29 @@ public static class CatalogFetcher
             return CatalogFetch.Failed("The Academy could not be reached.");
         }
 
-        return new CatalogFetch(challenges, skipped, null);
+        return new CatalogFetch(challenges, skipped, null) { Bests = bests, LinkHint = link?.Hint, LinkUrl = link?.Url };
+    }
+
+    /// <summary>Reads one plan's bests. Never throws: bests must not cost the catalog.</summary>
+    /// <param name="api">The Labs client.</param>
+    /// <param name="token">The ARA bearer token.</param>
+    /// <param name="planId">The plan to read.</param>
+    /// <param name="cancel">Cancels the refresh.</param>
+    /// <returns>The bests, or null with the 409's hint when Garage61 isn't linked.</returns>
+    private static async Task<(List<ServerBest>? Bests, (string Hint, string? Url)? Link)> Bests(
+        ApiClient api, string token, string planId, CancellationToken cancel)
+    {
+        try
+        {
+            var response = await api.GetResults(token, planId, cancel).ConfigureAwait(false);
+
+            if (response.Status == 409) return (null, ServerResults.LinkHint(response.Body));
+            return (response.Ok ? ServerResults.Parse(response.Body) : null, null);
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException && !cancel.IsCancellationRequested)
+        {
+            return (null, null);
+        }
     }
 
     /// <summary>Lists every plan id, following pagination to the end.</summary>
