@@ -15,6 +15,7 @@ public class CatalogFetcherTests
         public (HttpStatusCode Status, string Body) List { get; set; } = (HttpStatusCode.OK, "");
         public (HttpStatusCode Status, string Body) Detail { get; set; } = (HttpStatusCode.OK, "");
         public (HttpStatusCode Status, string Body) Session { get; set; } = (HttpStatusCode.OK, "{}");
+        public (HttpStatusCode Status, string Body) Results { get; set; } = (HttpStatusCode.OK, "");
 
         public List<string> Requested { get; } = [];
 
@@ -25,6 +26,7 @@ public class CatalogFetcherTests
 
             var (status, body) =
                 path.Contains("/auth/session") ? Session
+                : path.EndsWith("/results") ? Results
                 : path.Contains("/training-plans?") ? List
                 : Detail;
 
@@ -58,8 +60,110 @@ public class CatalogFetcherTests
           "trainingPlan": { "id": "p", "content": [{{Content(contentId, trackPlatformId)}}] } }
         """;
 
-    private static Task<CatalogFetch> Fetch(Routes routes) =>
-        CatalogFetcher.Fetch(new ApiClient(new Uri("https://labs.example"), routes), "ara_token");
+    private static Task<CatalogFetch> Fetch(Routes routes, bool withBests = false) =>
+        CatalogFetcher.Fetch(new ApiClient(new Uri("https://labs.example"), routes), "ara_token", withBests);
+
+    private const string SilverBest = """
+        { "trainingPlanId": "p", "team": "t", "fetchedAt": "2026-11-10T12:00:00Z",
+          "items": [ { "contentId": "c1", "best": { "lapId": "l", "eventId": null, "lapTime": 49.5,
+                       "drivenAt": "2026-09-20T12:00:00Z", "targetReached": "silver" } } ] }
+        """;
+
+    [Fact]
+    public async Task BringsBackTheMembersBestsWhenAsked()
+    {
+        var routes = new Routes
+        {
+            List = (HttpStatusCode.OK, Listing("plan-a")),
+            Detail = (HttpStatusCode.OK, Detail("c1", 166)),
+            Results = (HttpStatusCode.OK, SilverBest),
+        };
+
+        var fetch = await Fetch(routes, withBests: true);
+
+        Assert.True(fetch.Usable);
+        Assert.Equal(new ServerBest("c1", 49.5, Medal.Silver), Assert.Single(fetch.Bests!));
+        Assert.Contains("/api/v1/garage61/training-plans/plan-a/results", routes.Requested);
+    }
+
+    [Fact]
+    public async Task OnlyAsksForBestsWhenTold()
+    {
+        var routes = new Routes { List = (HttpStatusCode.OK, Listing("plan-a")), Detail = (HttpStatusCode.OK, Detail("c1", 166)) };
+
+        var fetch = await Fetch(routes);
+
+        Assert.Null(fetch.Bests);
+        Assert.DoesNotContain(routes.Requested, p => p.EndsWith("/results"));
+    }
+
+    [Theory]
+    [InlineData("G61_NOT_LINKED")]
+    [InlineData("G61_RECONNECT_REQUIRED")]
+    [InlineData("G61_IDENTITY_MISMATCH")]
+    public async Task AnUnlinkedMemberKeepsTheCatalogAndGetsAHint(string code)
+    {
+        // 409 is about Garage61, not the ARA session: no error, no sign-in, just local-only.
+        var routes = new Routes
+        {
+            List = (HttpStatusCode.OK, Listing("plan-a")),
+            Detail = (HttpStatusCode.OK, Detail("c1", 166)),
+            Results = (HttpStatusCode.Conflict,
+                $$"""{ "error": "x", "code": "{{code}}", "message": "m", "linkUrl": "https://labs.example/link", "requestId": "r" }"""),
+        };
+
+        var fetch = await Fetch(routes, withBests: true);
+
+        Assert.True(fetch.Usable);
+        Assert.Null(fetch.Error);
+        Assert.Null(fetch.Bests);
+        Assert.NotNull(fetch.LinkHint);
+        Assert.Equal("https://labs.example/link", fetch.LinkUrl);
+    }
+
+    [Fact]
+    public async Task FailedBestsNeverCostTheCatalog()
+    {
+        var routes = new Routes
+        {
+            List = (HttpStatusCode.OK, Listing("plan-a")),
+            Detail = (HttpStatusCode.OK, Detail("c1", 166)),
+            Results = (HttpStatusCode.BadGateway, "<html>bad gateway</html>"),
+        };
+
+        var fetch = await Fetch(routes, withBests: true);
+
+        Assert.True(fetch.Usable);
+        Assert.Null(fetch.Bests);
+        Assert.Null(fetch.LinkHint);
+    }
+
+    [Fact]
+    public async Task OnePlansBestsFailingDropsThemAll()
+    {
+        // Server wins on merge, so half a set would be seeded once and never completed.
+        var routes = new Routes
+        {
+            List = (HttpStatusCode.OK, Listing("plan-a", "plan-b")),
+            Detail = (HttpStatusCode.OK, Detail("c1", 166)),
+            Results = (HttpStatusCode.OK, SilverBest),
+        };
+        var handler = new FailSecond(routes);
+
+        var fetch = await CatalogFetcher.Fetch(new ApiClient(new Uri("https://labs.example"), handler), "ara_token", withBests: true);
+
+        Assert.True(fetch.Usable);
+        Assert.Null(fetch.Bests);
+    }
+
+    /// <summary>Fails the second plan's results and passes everything else through.</summary>
+    private sealed class FailSecond(Routes inner) : DelegatingHandler(inner)
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancel) =>
+            request.RequestUri!.AbsolutePath.EndsWith("plan-b/results")
+                ? Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) { Content = new StringContent("{}") })
+                : base.SendAsync(request, cancel);
+    }
 
     [Fact]
     public async Task ReadsEveryPlanIntoOneCatalog()

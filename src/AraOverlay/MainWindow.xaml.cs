@@ -59,6 +59,9 @@ public partial class MainWindow : Window
     private LoginStatus _loginStatus = LoginStatus.Idle;
     private DateTimeOffset _loginSettled;
     private bool _refreshing;
+    private bool _seeded;
+    private bool _linkHintShown;
+    private string? _linkUrl;
     private IntPtr _hwnd;
     private bool _hotkeyClaimed;
     private double? _lastLap;
@@ -223,6 +226,8 @@ public partial class MainWindow : Window
             Visible = true,
             ContextMenuStrip = menu,
         };
+
+        _tray.BalloonTipClicked += (_, _) => { if (_linkUrl is not null) OpenBrowser(_linkUrl); };
     }
 
     /// <summary>How long a finished login's message stays up before the panel moves on.</summary>
@@ -403,7 +408,7 @@ public partial class MainWindow : Window
 
             try
             {
-                fetched = await CatalogFetcher.Fetch(_api, stored.Token).ConfigureAwait(false);
+                fetched = await CatalogFetcher.Fetch(_api, stored.Token, withBests: !_seeded).ConfigureAwait(false);
             }
             catch (Exception e)
             {
@@ -418,6 +423,16 @@ public partial class MainWindow : Window
                 _refreshing = false;
 
                 if (fetched.Skipped.Count > 0) SdkService.Log(string.Join(Environment.NewLine, fetched.Skipped));
+
+                // Once per sign-in: later refreshes would overwrite laps Garage61 hasn't processed yet.
+                if (fetched.Bests is { } bests && !_seeded)
+                {
+                    _progress.MergeFromServer(bests);
+                    _seeded = true;
+                    RenderState();
+                }
+
+                if (fetched.LinkHint is { } hint) ShowLinkHint(hint, fetched.LinkUrl);
 
                 if (!fetched.Usable)
                 {
@@ -452,7 +467,21 @@ public partial class MainWindow : Window
             _ = Task.Run(() => _api.RevokeSession(stored.Token));
 
         TokenStore.Clear();
+        _seeded = false;
         UpdateSignInItem();
+    }
+
+    /// <summary>Tells the member, once per run, why medals are local-only; clicking opens the link page.</summary>
+    /// <param name="hint">The one-line reason.</param>
+    /// <param name="url">The https page that fixes it, if any.</param>
+    private void ShowLinkHint(string hint, string? url)
+    {
+        SdkService.Log(hint);
+        if (_linkHintShown || _tray is null) return;
+
+        _linkHintShown = true;
+        _linkUrl = url;
+        _tray.ShowBalloonTip(10_000, "Medals on this PC only", url is null ? hint : $"{hint} Click to open the Academy.", Forms.ToolTipIcon.Info);
     }
 
     /// <summary>Stops a login in progress and clears the panel.</summary>

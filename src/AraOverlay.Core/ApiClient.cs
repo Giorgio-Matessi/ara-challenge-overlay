@@ -87,6 +87,14 @@ public sealed class ApiClient : IDisposable
     public Task<ApiResponse> GetPlan(string token, string planId, CancellationToken cancel = default) =>
         Get($"/api/v1/garage61/training-plans/{Uri.EscapeDataString(planId)}", token, cancel);
 
+    /// <summary>Reads the member's best recorded lap per challenge in one plan.</summary>
+    /// <param name="token">The ARA bearer token.</param>
+    /// <param name="planId">The plan's ULID.</param>
+    /// <param name="cancel">Cancels the request.</param>
+    /// <returns>The results response, or 409 when Garage61 isn't linked.</returns>
+    public Task<ApiResponse> GetResults(string token, string planId, CancellationToken cancel = default) =>
+        Get($"/api/v1/garage61/training-plans/{Uri.EscapeDataString(planId)}/results", token, cancel);
+
     /// <summary>Checks the session is still live and still Gold.</summary>
     /// <param name="token">The ARA bearer token.</param>
     /// <param name="cancel">Cancels the request.</param>
