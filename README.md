@@ -26,6 +26,7 @@ The tray menu also holds when it shows:
 | Option | |
 |---|---|
 | **Show overlay** | Hides or shows the overlay for this run. |
+| **Panel size** | Enlarges the overlay from 100% to 200%, for 4K or triple screens or easier reading. |
 | **Show with iRacing only** | Hides the ARA mark, so nothing is on screen until iRacing is up. |
 | **Start minimized** | Starts with the overlay hidden; tick **Show overlay** to bring it back. |
 | **Start with Windows** | Launches the overlay when you sign in to Windows. Move the exe and you'll need to tick it again. |
