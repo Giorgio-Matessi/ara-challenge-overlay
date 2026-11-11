@@ -28,14 +28,13 @@
         <ImageBrush x:Key="BronzeArt" ImageSource="/assets/bronze.png" Stretch="UniformToFill" Opacity="0.5"/>
 
         <Style x:Key="Label" TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="Segoe UI Semibold"/>
+            <Setter Property="FontWeight" Value="Medium"/>
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="Foreground" Value="{StaticResource Dim}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
         <Style x:Key="Value" TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="Consolas"/>
             <Setter Property="FontSize" Value="15"/>
             <Setter Property="Foreground" Value="{StaticResource Ink}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
@@ -47,7 +46,9 @@
         </Style>
     </Window.Resources>
 
-    <Grid x:Name="Root">
+    <!-- Sentient for everything (#49). The fonts are gitignored, so a build without them falls
+         back to Segoe UI; Release refuses to build without them. -->
+    <Grid x:Name="Root" TextElement.FontFamily="./fonts/#Sentient, Segoe UI">
 
         <!-- Shown until iRacing is running. The image is 1000x600, so it needs an explicit
              width or it sizes the whole window: 410 is the panel's full width. -->
@@ -93,7 +94,7 @@
                         <Border x:Name="WetMark" DockPanel.Dock="Right" Visibility="Collapsed"
                                 BorderBrush="{StaticResource Ink}" BorderThickness="1" CornerRadius="7"
                                 Padding="6,0" Margin="8,-1,0,-1" VerticalAlignment="Center">
-                            <TextBlock Text="WET" FontFamily="Segoe UI Black" FontSize="11"
+                            <TextBlock Text="WET" FontWeight="Bold" FontSize="11"
                                        Foreground="{StaticResource Ink}"/>
                         </Border>
                         <TextBlock x:Name="TitleText" Style="{StaticResource Label}" TextAlignment="Center"
@@ -106,7 +107,7 @@
                     <StackPanel HorizontalAlignment="Center">
                         <TextBlock x:Name="DeltaText"
                                    Text="—"
-                                   FontFamily="Segoe UI Black" FontSize="34"
+                                   FontWeight="Bold" FontSize="34"
                                    Foreground="{StaticResource Dim}"
                                    HorizontalAlignment="Center"/>
                         <TextBlock x:Name="DeltaCaption" Style="{StaticResource Label}" HorizontalAlignment="Center"/>
@@ -156,7 +157,7 @@
                 <TextBlock x:Name="StatusText"
                            Visibility="Collapsed"
                            Margin="0,7,0,1"
-                           FontFamily="Consolas" FontSize="12"
+                           FontSize="12"
                            Foreground="{StaticResource Dim}"
                            TextWrapping="Wrap"/>
 
@@ -169,11 +170,11 @@
                                HorizontalAlignment="Center"
                                Text="ENTER THIS CODE IN YOUR BROWSER"/>
                     <TextBlock x:Name="LoginCode"
-                               FontFamily="Consolas" FontSize="34" FontWeight="Bold"
+                               FontSize="34" FontWeight="Bold"
                                Foreground="{StaticResource Ink}"
                                HorizontalAlignment="Center" Margin="0,4"/>
                     <TextBlock x:Name="LoginMessage"
-                               FontFamily="Segoe UI" FontSize="11"
+                               FontSize="11"
                                Foreground="{StaticResource Dim}"
                                HorizontalAlignment="Center"
                                TextWrapping="Wrap" TextAlignment="Center"/>
@@ -197,15 +198,15 @@
                 <Border x:Name="BannerArt" CornerRadius="8"/>
                 <StackPanel HorizontalAlignment="Center" Margin="22,16">
                     <TextBlock x:Name="BannerTitle"
-                               FontFamily="Segoe UI Black" FontSize="30"
+                               FontWeight="Bold" FontSize="30"
                                Foreground="{StaticResource Ink}"
                                HorizontalAlignment="Center"/>
                     <TextBlock x:Name="BannerTime"
-                               FontFamily="Consolas" FontSize="22"
+                               FontSize="22"
                                Foreground="{StaticResource Ink}"
                                HorizontalAlignment="Center" Margin="0,2,0,0"/>
                     <TextBlock x:Name="BannerSub"
-                               FontFamily="Segoe UI" FontSize="12"
+                               FontSize="12"
                                Foreground="{StaticResource Ink}"
                                HorizontalAlignment="Center" Margin="0,4,0,0"/>
                 </StackPanel>

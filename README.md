@@ -53,6 +53,13 @@ dotnet build src/AraOverlay                      # Windows only (WPF)
 dotnet publish src/AraOverlay -c Release -r win-x64 --self-contained  # one exe for the league
 ```
 
+The overlay is set in [Sentient](https://www.fontshare.com/fonts/sentient). Its licence forbids
+putting the font files in a repository or passing them on, so they are not in this one: whoever
+builds a release downloads Sentient from Fontshare and copies `Sentient-Regular.otf`,
+`Sentient-Medium.otf` and `Sentient-Bold.otf` from its `Fonts/OTF/` folder into
+`src/AraOverlay/fonts/`, exactly as downloaded (no renaming, subsetting or conversion). A Debug
+build without them falls back to Segoe UI; a Release build fails.
+
 ## Licence
 
 GPL-3.0, inherited from [IRSDKSharper](https://github.com/mherbold/IRSDKSharper).
