@@ -20,8 +20,9 @@ namespace AraOverlay;
 
 /// <summary>
 /// The overlay window and its tray icon. Shows the active challenge's target times, the live lap,
-/// and a banner when a lap earns a new medal; hides itself when iRacing isn't running, and lists
-/// the ids the sim reported when the track and car match no challenge.
+/// and a banner when a lap earns a new medal; shows the ARA mark while iRacing isn't running, or
+/// nothing if the member asked for it with iRacing only, and lists the ids the sim reported when
+/// the track and car match no challenge.
 /// </summary>
 public partial class MainWindow : Window
 {
@@ -68,6 +69,8 @@ public partial class MainWindow : Window
     private Medal _goal = Medal.Gold;
     private double _goalTarget;
     private bool _demo;
+    private bool _shown;
+    private Layer _layer;
 
     /// <summary>Restores the saved position and marshals the SDK's events onto the UI thread.</summary>
     public MainWindow()
@@ -76,6 +79,7 @@ public partial class MainWindow : Window
 
         Left = _settings.Left;
         Top = _settings.Top;
+        _shown = !_settings.StartMinimized;
 
         _bannerTimer.Tick += (_, _) => HideBanner();
         _loginTimer.Tick += (_, _) => OnLoginTick();
@@ -86,7 +90,10 @@ public partial class MainWindow : Window
         _sdk.LapFinished += lap => Dispatcher.InvokeAsync(() => OnLapFinished(lap));
     }
 
-    /// <summary>Applies the window styles and tray icon, then starts the SDK or the demo.</summary>
+    /// <summary>
+    /// Applies the window styles and tray icon, then starts the SDK or the demo. The window has a
+    /// handle but isn't shown yet; the first layer decides whether it ever appears.
+    /// </summary>
     /// <param name="e">Unused.</param>
     protected override void OnSourceInitialized(EventArgs e)
     {
@@ -95,6 +102,8 @@ public partial class MainWindow : Window
         ClaimLockHotkey();
         ApplyWindowStyles();
         BuildTrayIcon();
+
+        Dispatcher.InvokeAsync(() => ShowLayer(Layer.Waiting));
 
         if (Environment.GetCommandLineArgs().Contains("--demo"))
         {
@@ -214,6 +223,11 @@ public partial class MainWindow : Window
         menu.Items.Add(_matchItem);
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add(_lockItem);
+        menu.Items.Add(Option("Show overlay", _shown, item => { _shown = item.Checked; ApplyVisibility(); }));
+        menu.Items.Add(new Forms.ToolStripSeparator());
+        menu.Items.Add(Option("Show with iRacing only", _settings.IRacingOnly, item => { _settings.IRacingOnly = item.Checked; _settings.Save(); ApplyVisibility(); }));
+        menu.Items.Add(Option("Start minimized", _settings.StartMinimized, item => { _settings.StartMinimized = item.Checked; _settings.Save(); }));
+        menu.Items.Add(Option("Start with Windows", Autostart.Enabled, SetAutostart));
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add(new Forms.ToolStripMenuItem("Exit", null, (_, _) => Quit()));
 
@@ -228,6 +242,33 @@ public partial class MainWindow : Window
         };
 
         _tray.BalloonTipClicked += (_, _) => { if (_linkUrl is not null) OpenBrowser(_linkUrl); };
+    }
+
+    /// <summary>Makes a tray item that ticks itself when clicked.</summary>
+    /// <param name="text">The label.</param>
+    /// <param name="on">Whether it starts ticked.</param>
+    /// <param name="clicked">Runs after the tick flips, with the item.</param>
+    /// <returns>The item.</returns>
+    private static Forms.ToolStripMenuItem Option(string text, bool on, Action<Forms.ToolStripMenuItem> clicked)
+    {
+        var item = new Forms.ToolStripMenuItem(text) { CheckOnClick = true, Checked = on };
+        item.Click += (_, _) => clicked(item);
+        return item;
+    }
+
+    /// <summary>Adds or removes the Run entry to match the tick, putting the tick back if Windows refuses.</summary>
+    /// <param name="item">The Start with Windows item, already flipped.</param>
+    private static void SetAutostart(Forms.ToolStripMenuItem item)
+    {
+        try
+        {
+            Autostart.Enabled = item.Checked;
+        }
+        catch (Exception e) when (e is UnauthorizedAccessException or System.Security.SecurityException or IOException)
+        {
+            SdkService.Log($"Start with Windows: {e.Message}");
+            item.Checked = !item.Checked;
+        }
     }
 
     /// <summary>How long a finished login's message stays up before the panel moves on.</summary>
@@ -294,8 +335,6 @@ public partial class MainWindow : Window
         };
 
         demo.Start();
-
-        ShowLayer(Layer.Waiting);
     }
 
     /// <summary>Loads the tray icon at the size Windows wants.</summary>
@@ -785,10 +824,20 @@ public partial class MainWindow : Window
     /// <param name="layer">The layer to show.</param>
     private void ShowLayer(Layer layer)
     {
+        _layer = layer;
+        ApplyVisibility();
+
         Waiting.Visibility = layer == Layer.Waiting ? Visibility.Visible : Visibility.Collapsed;
         Panel.Visibility = layer == Layer.Panel ? Visibility.Visible : Visibility.Collapsed;
         Banner.Visibility = layer == Layer.Medal ? Visibility.Visible : Visibility.Collapsed;
     }
+
+    /// <summary>
+    /// Shows or hides the whole window: hidden while the member has hidden it, or while it would
+    /// only be the waiting art and they want it with iRacing only.
+    /// </summary>
+    private void ApplyVisibility() =>
+        Visibility = _shown && !(_layer == Layer.Waiting && _settings.IRacingOnly) ? Visibility.Visible : Visibility.Hidden;
 
     /// <summary>What shows when no medal banner is up: the panel, or the waiting art.</summary>
     private Layer RestingLayer =>

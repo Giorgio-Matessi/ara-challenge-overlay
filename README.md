@@ -21,6 +21,15 @@ target times, and pops a banner the moment you set a clean lap quick enough to e
 Run `AraChallengeOverlay.exe` and leave it running — it lives in the system tray and shows the
 ARA mark until iRacing is up, so you can unlock it and drag it into place before a session.
 
+The tray menu also holds when it shows:
+
+| Option | |
+|---|---|
+| **Show overlay** | Hides or shows the overlay for this run. |
+| **Show with iRacing only** | Hides the ARA mark, so nothing is on screen until iRacing is up. |
+| **Start minimized** | Starts with the overlay hidden; tick **Show overlay** to bring it back. |
+| **Start with Windows** | Launches the overlay when you sign in to Windows. Move the exe and you'll need to tick it again. |
+
 On a challenge's track and car, the panel reads top to bottom:
 
 | Row | |
@@ -32,7 +41,7 @@ On a challenge's track and car, the panel reads top to bottom:
 
 
 Your best time and best medal per challenge live in
-`%APPDATA%\AraOverlay\progress.json`; window position and lock state in `settings.json` beside it.
+`%APPDATA%\AraOverlay\progress.json`; window position, lock state and the show options in `settings.json` beside it.
 If the overlay ever stops responding to the sim, `errors.log` in the same folder records what the
 iRacing SDK threw — send it along with the report.
 The banner only fires when you *improve* a tier, so a second gold lap won't interrupt you again.

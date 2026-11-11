@@ -1,5 +1,6 @@
 using System.Threading;
 using System.Windows;
+using System.Windows.Interop;
 
 using Application = System.Windows.Application;
 using MessageBox = System.Windows.MessageBox;
@@ -14,7 +15,10 @@ public partial class App : Application
 {
     private static Mutex? _singleInstance;
 
-    /// <summary>Claims the instance mutex and shows the overlay, or bows out if one is running.</summary>
+    /// <summary>
+    /// Claims the instance mutex and creates the overlay, or bows out if one is running. Only the
+    /// handle is created here; the overlay shows itself, unless it was asked to start minimized.
+    /// </summary>
     /// <param name="e">Startup arguments.</param>
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -32,6 +36,6 @@ public partial class App : Application
         }
 
         base.OnStartup(e);
-        new MainWindow().Show();
+        new WindowInteropHelper(new MainWindow()).EnsureHandle();
     }
 }

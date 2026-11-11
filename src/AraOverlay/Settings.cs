@@ -2,12 +2,14 @@ using AraOverlay.Core;
 
 namespace AraOverlay;
 
-/// <summary>Where the driver dragged the overlay to, and whether it's pinned there.</summary>
+/// <summary>Where the driver dragged the overlay to, whether it's pinned there, and when it shows.</summary>
 public sealed class Settings
 {
     public double Left { get; set; } = 40;
     public double Top { get; set; } = 40;
     public bool Locked { get; set; } = true;
+    public bool StartMinimized { get; set; }
+    public bool IRacingOnly { get; set; }
 
     private static string FilePath => JsonFile.PathIn("settings.json");
 
