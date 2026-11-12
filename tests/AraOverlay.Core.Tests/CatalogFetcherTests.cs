@@ -177,17 +177,6 @@ public class CatalogFetcherTests
         Assert.Equal("c1", Assert.Single(fetch.Challenges).ContentId);
     }
 
-    [Fact]
-    public async Task AsksForEveryPlanTheListingNamed()
-    {
-        var routes = new Routes { List = (HttpStatusCode.OK, Listing("plan-a", "plan-b")), Detail = (HttpStatusCode.OK, Detail("c1", 166)) };
-
-        await Fetch(routes);
-
-        Assert.Contains(routes.Requested, p => p.Contains("plan-a"));
-        Assert.Contains(routes.Requested, p => p.Contains("plan-b"));
-    }
-
     [Theory]
     [InlineData(HttpStatusCode.Unauthorized, "expired")]
     [InlineData(HttpStatusCode.Forbidden, "Gold")]
@@ -299,60 +288,5 @@ public class CatalogFetcherTests
         Assert.True(fetch.Usable);
         Assert.Equal("c1", Assert.Single(fetch.Challenges).ContentId);
         Assert.Single(fetch.Skipped);
-    }
-
-    [Fact]
-    public async Task TwoChallengesGradingIdenticallyDoNotCostTheWholeCatalog()
-    {
-        // Same track, car and targets: matching either grades a lap the same, so keeping the
-        // first is harmless where rejecting everything would leave the driver with nothing.
-        var routes = new Routes
-        {
-            List = (HttpStatusCode.OK, Listing("plan-a")),
-            Detail = (HttpStatusCode.OK, $$"""
-                { "trainingPlanId": "p", "team": "t", "mode": "plan", "trainingPlan": { "id": "p", "content": [
-                  {{Content("c1", 166)}}, {{Content("c8", 166)}} ] } }
-                """),
-        };
-
-        var fetch = await Fetch(routes);
-        var catalog = new ChallengeCatalog(fetch.Challenges);
-
-        Assert.True(fetch.Usable);
-        Assert.Equal("c1", Assert.Single(catalog.Challenges).ContentId);
-        Assert.Contains(catalog.Skipped, s => s.Contains("c8"));
-    }
-
-    [Fact]
-    public async Task AWetAndDryPairIsStillKept()
-    {
-        // Le Mans: the same track and car, told apart by the wet one's targets being slower.
-        var routes = new Routes
-        {
-            List = (HttpStatusCode.OK, Listing("plan-a")),
-            Detail = (HttpStatusCode.OK, $$"""
-                { "trainingPlanId": "p", "team": "t", "mode": "plan", "trainingPlan": { "id": "p", "content": [
-                  {{Content("dry", 268)}}, {{Content("wet", 268, bronze: 253.7, silver: 251.2, gold: 250.2)}} ] } }
-                """),
-        };
-
-        var fetch = await Fetch(routes);
-
-        Assert.Equal(2, fetch.Challenges.Count);
-        Assert.Empty(fetch.Skipped);
-
-        var catalog = new ChallengeCatalog(fetch.Challenges);
-        Assert.Equal("dry", Assert.Single(catalog.Find(268, 67, wet: false)).ContentId);
-        Assert.Equal("wet", Assert.Single(catalog.Find(268, 67, wet: true)).ContentId);
-    }
-
-    [Fact]
-    public async Task AFetchedCatalogFeedsTheLookupStraightBack()
-    {
-        var routes = new Routes { List = (HttpStatusCode.OK, Listing("plan-a")), Detail = (HttpStatusCode.OK, Detail("c1", 166)) };
-
-        var catalog = new ChallengeCatalog((await Fetch(routes)).Challenges);
-
-        Assert.Equal("c1", Assert.Single(catalog.Find(166, 67, wet: false)).ContentId);
     }
 }

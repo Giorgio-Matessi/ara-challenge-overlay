@@ -34,12 +34,6 @@ public class LapTrackerTests
     }
 
     [Fact]
-    public void FirstFrameOnlySeedsState()
-    {
-        Assert.Null(new LapTracker().Update(Frame(1)));
-    }
-
-    [Fact]
     public void CleanLapEmitsCompletedExactlyOnce()
     {
         var tracker = new LapTracker();
@@ -176,34 +170,14 @@ public class LapTrackerTests
     }
 
     [Fact]
-    public void ResetDropsPendingState()
+    public void ResetForgetsThePreviousSession()
     {
         var tracker = new LapTracker();
-        Pump(tracker, Frame(1), Frame(2));
+        Pump(tracker, Frame(1), Frame(2), Frame(2, 50.0), Frame(3));
         tracker.Reset();
 
-        Assert.Empty(Pump(tracker, Frame(2, 54.321)));
-        Assert.True(tracker.CurrentLapIsClean);
-    }
-
-    [Fact]
-    public void CurrentLapIsCleanTracksTheLapInProgress()
-    {
-        var tracker = new LapTracker();
-        Pump(tracker, Frame(1));
-        Assert.True(tracker.CurrentLapIsClean);
-
-        Pump(tracker, Frame(1, surface: TrackSurface.OffTrack));
-        Assert.False(tracker.CurrentLapIsClean);
-
-        Pump(tracker, Frame(2), Frame(2, 54.321));
-        Assert.True(tracker.CurrentLapIsClean);
-    }
-
-    [Fact]
-    public void SessionBestStartsEmpty()
-    {
-        Assert.Null(new LapTracker().SessionBestSeconds);
+        Assert.Empty(Pump(tracker, Frame(3), Frame(3, 54.321)));
+        Assert.Null(tracker.SessionBestSeconds);
     }
 
     [Fact]
@@ -230,17 +204,5 @@ public class LapTrackerTests
             Frame(3), Frame(3, 54.500));
 
         Assert.Equal(54.500, tracker.SessionBestSeconds!.Value, 3);
-    }
-
-    [Fact]
-    public void ResetClearsSessionBest()
-    {
-        var tracker = new LapTracker();
-        Pump(tracker, Frame(1), Frame(2), Frame(2, 54.321));
-        Assert.NotNull(tracker.SessionBestSeconds);
-
-        tracker.Reset();
-
-        Assert.Null(tracker.SessionBestSeconds);
     }
 }

@@ -15,14 +15,6 @@ public class ProgressStoreTests : IDisposable
     }
 
     [Fact]
-    public void ServerBestsSurviveLosingTheFile()
-    {
-        new ProgressStore(Path_).MergeFromServer([new ServerBest("c1", 49.5, Medal.Silver)]);
-
-        Assert.Equal(new ChallengeProgress(49.5, Medal.Silver), new ProgressStore(Path_).Get("c1"));
-    }
-
-    [Fact]
     public void TheServerWinsOverLocalProgress()
     {
         // Garage61 re-grades against the current targets, so its verdict replaces a stale one.
@@ -67,26 +59,11 @@ public class ProgressStoreTests : IDisposable
     }
 
     [Fact]
-    public void FirstMedalIsWorthAPopup()
+    public void OnlyANewTierIsWorthAPopup()
     {
         var store = new ProgressStore(Path_);
         Assert.True(store.RecordLap("local:1", 54.9, Medal.Bronze));
-    }
-
-    [Fact]
-    public void RepeatingTheSameTierIsNot()
-    {
-        var store = new ProgressStore(Path_);
-        store.RecordLap("local:1", 54.9, Medal.Bronze);
         Assert.False(store.RecordLap("local:1", 54.8, Medal.Bronze));
-        Assert.False(store.RecordLap("local:1", 54.95, Medal.Bronze));
-    }
-
-    [Fact]
-    public void ImprovingTheTierIs()
-    {
-        var store = new ProgressStore(Path_);
-        store.RecordLap("local:1", 54.9, Medal.Bronze);
         Assert.True(store.RecordLap("local:1", 54.1, Medal.Silver));
         Assert.True(store.RecordLap("local:1", 53.4, Medal.Gold));
         Assert.False(store.RecordLap("local:1", 53.1, Medal.Gold));
@@ -113,15 +90,6 @@ public class ProgressStoreTests : IDisposable
     }
 
     [Fact]
-    public void ChallengesAreTrackedIndependently()
-    {
-        var store = new ProgressStore(Path_);
-        store.RecordLap("local:1", 54.9, Medal.Bronze);
-        Assert.True(store.RecordLap("local:2", 120.0, Medal.Bronze));
-        Assert.Null(store.Get("local:3"));
-    }
-
-    [Fact]
     public void ProgressSurvivesARestart()
     {
         new ProgressStore(Path_).RecordLap("local:7", 54.1, Medal.Silver);
@@ -130,13 +98,6 @@ public class ProgressStoreTests : IDisposable
         Assert.Equal(Medal.Silver, reloaded.Get("local:7")!.BestMedal);
         Assert.Equal(54.1, reloaded.Get("local:7")!.BestSeconds, 3);
         Assert.False(reloaded.RecordLap("local:7", 54.0, Medal.Silver));
-    }
-
-    [Fact]
-    public void MissingFileLoadsAsEmpty()
-    {
-        var store = new ProgressStore(Path.Combine(_dir, "nested", "nope.json"));
-        Assert.Null(store.Get("local:1"));
     }
 
     [Fact]

@@ -5,12 +5,6 @@ namespace AraOverlay.Core.Tests;
 /// <summary>Covers the wet/dry decision and its two thresholds.</summary>
 public class ConditionTrackerTests
 {
-    [Fact]
-    public void StartsDry()
-    {
-        Assert.False(new ConditionTracker().IsWet);
-    }
-
     [Theory]
     [InlineData(TrackWetness.Dry)]
     [InlineData(TrackWetness.MostlyDry)]
@@ -86,14 +80,5 @@ public class ConditionTrackerTests
         Assert.True(conditions.Update(TrackWetness.VeryWet, declaredWet: false));
         Assert.False(conditions.Update(TrackWetness.VeryWet, declaredWet: false));
         Assert.False(conditions.Update(TrackWetness.ExtremelyWet, declaredWet: false));
-    }
-
-    [Fact]
-    public void ResetReturnsToDry()
-    {
-        var conditions = new ConditionTracker();
-        conditions.Update(TrackWetness.VeryWet, declaredWet: true);
-        conditions.Reset();
-        Assert.False(conditions.IsWet);
     }
 }

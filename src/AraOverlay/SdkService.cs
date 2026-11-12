@@ -22,13 +22,11 @@ public sealed class SdkService : IDisposable
     private readonly IRacingSdk _sdk = new();
     private readonly LapTracker _tracker = new();
     private readonly ConditionTracker _conditions = new();
-    private ChallengeCatalog _catalog = new([]);
-    private ChallengeCatalog? _staged;
+    private readonly ChallengeMatcher _matcher = new();
 
     private static readonly TimeSpan RestartDelay = TimeSpan.FromSeconds(2);
 
     private string _lastLogged = "";
-    private int _selected;
     private int _restarting;
 
     public bool Connected { get; private set; }
@@ -37,13 +35,10 @@ public sealed class SdkService : IDisposable
     public string TrackName { get; private set; } = "";
     public string CarName { get; private set; } = "";
     public bool IsWet => _conditions.IsWet;
-    public bool HasChallenges => _catalog.Challenges.Count > 0;
+    public bool HasChallenges => _matcher.HasChallenges;
     public double? SessionBest => _tracker.SessionBestSeconds;
-    /// <summary>Every challenge this track and car could be, one per plan.</summary>
-    public IReadOnlyList<Challenge> Matches { get; private set; } = [];
-
-    /// <summary>Which of the matches the panel is showing.</summary>
-    public Challenge? Challenge => _selected < Matches.Count ? Matches[_selected] : null;
+    public IReadOnlyList<Challenge> Matches => _matcher.Matches;
+    public Challenge? Challenge => _matcher.Current;
 
     public event Action? StateChanged;
     public event Action<LiveLap>? Tick;
@@ -129,8 +124,7 @@ public sealed class SdkService : IDisposable
     private void HandleDisconnected()
     {
         Connected = false;
-        Matches = [];
-        _selected = 0;
+        _matcher.Clear();
         TrackId = CarId = 0;
         TrackName = CarName = "";
         _tracker.Reset();
@@ -194,48 +188,24 @@ public sealed class SdkService : IDisposable
         }
     }
 
-    /// <summary>
-    /// Hands over a newly fetched catalog. It is staged rather than applied: swapping targets
-    /// under a driver mid-lap would move the numbers on the panel and grade the lap against rows
-    /// they never saw. It takes effect at the next moment no challenge is live.
-    /// </summary>
+    /// <summary>Hands over a newly fetched catalog; it waits while a challenge is live.</summary>
     /// <param name="catalog">The catalog to move to.</param>
     public void SwapCatalog(ChallengeCatalog catalog)
     {
-        _staged = catalog;
-        if (Challenge is null) Rematch();
+        if (_matcher.Swap(catalog, TrackId, CarId, IsWet)) StateChanged?.Invoke();
     }
 
-    /// <summary>
-    /// Picks a different one of the current matches, for a track and car more than one plan uses.
-    /// </summary>
+    /// <summary>Picks a different one of the current matches.</summary>
     /// <param name="index">Which match to show.</param>
     public void SelectMatch(int index)
     {
-        if (index < 0 || index >= Matches.Count) return;
-
-        _selected = index;
-        StateChanged?.Invoke();
+        if (_matcher.Select(index)) StateChanged?.Invoke();
     }
 
     /// <summary>Re-runs the lookup, for a session change or a flip between wet and dry.</summary>
     private void Rematch()
     {
-        if (_staged is { } next && Challenge is null)
-        {
-            _catalog = next;
-            _staged = null;
-        }
-
-        var found = _catalog.Find(TrackId, CarId, _conditions.IsWet);
-
-        // Keeps the driver's pick across a wet/dry flip or a session change where the same plans
-        // still apply; anything else starts from the first again.
-        var keep = Challenge?.Plan;
-
-        Matches = found;
-        _selected = keep is null ? 0 : Math.Max(0, found.ToList().FindIndex(c => c.Plan == keep));
-
+        _matcher.Match(TrackId, CarId, IsWet);
         StateChanged?.Invoke();
     }
 
