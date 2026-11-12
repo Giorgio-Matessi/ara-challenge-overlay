@@ -26,7 +26,7 @@ The tray menu also holds when it shows:
 | **Start minimized** | Starts with the overlay hidden; tick **Show overlay** to bring it back. |
 | **Start with Windows** | Launches the overlay when you sign in to Windows. |
 
-On a challenge's track and car, the panel reads top to bottom:
+Upon launching a challenge, the panel reads top to bottom:
 
 | Row | |
 |---|---|
@@ -63,6 +63,13 @@ The overlay is set in [Sentient](https://www.fontshare.com/fonts/sentient).
 
 Please reach out to me directly via the following method for further support or questions:
 - Discord: @bicentricstone6
+
+## Acknowledgements
+
+Thank you to:
+- The Academy for helping me become a better racer and providing me with the tools to win more races
+- @pjstras for helping me test the overlay and suggest great features. 
+
 ## Licence
 
 GPL-3.0, inherited from [IRSDKSharper](https://github.com/mherbold/IRSDKSharper).
