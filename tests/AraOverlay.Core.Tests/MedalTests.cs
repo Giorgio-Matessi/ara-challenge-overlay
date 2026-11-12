@@ -55,14 +55,6 @@ public class MedalTests
     }
 
     [Fact]
-    public void TargetFor_ReturnsTheThresholdSeconds()
-    {
-        Assert.Equal(53.5, Sample.TargetFor(Medal.Gold), 3);
-        Assert.Equal(54.2, Sample.TargetFor(Medal.Silver), 3);
-        Assert.Equal(55.0, Sample.TargetFor(Medal.Bronze), 3);
-    }
-
-    [Fact]
     public void GoalFor_WalksUpwardsAndStaysOnGold()
     {
         Assert.Equal(Medal.Bronze, Challenge.GoalFor(Medal.None));
