@@ -36,6 +36,10 @@
     <Resource Include="..\..\assets\gold.png" Link="assets\gold.png" />
     <Resource Include="..\..\assets\silver.png" Link="assets\silver.png" />
     <Resource Include="..\..\assets\bronze.png" Link="assets\bronze.png" />
+
+    <!-- Brand fonts, gitignored: the ITF licence forbids putting them in a repository (#49).
+         A glob, so a clone without them still builds, in Segoe UI. -->
+    <Resource Include="fonts\*.otf" />
   </ItemGroup>
 
   <ItemGroup>
@@ -46,5 +50,11 @@
 
     <ProjectReference Include="..\AraOverlay.Core\AraOverlay.Core.csproj" />
   </ItemGroup>
+
+  <!-- A release must not quietly ship in Segoe UI. These are the weights MainWindow uses. -->
+  <Target Name="RequireBrandFonts" BeforeTargets="BeforeBuild" Condition="'$(Configuration)' == 'Release'">
+    <Error Condition="!Exists('fonts\Sentient-Regular.otf') Or !Exists('fonts\Sentient-Medium.otf') Or !Exists('fonts\Sentient-Bold.otf')"
+           Text="Release builds need Sentient-Regular, -Medium and -Bold.otf in src/AraOverlay/fonts/. Download Sentient from fontshare.com; see the README." />
+  </Target>
 
 </Project>

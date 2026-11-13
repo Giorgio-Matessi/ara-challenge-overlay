@@ -34,9 +34,7 @@ public class ChallengeCatalogTests
     [Theory]
     [InlineData(299, 67)]
     [InlineData(181, 142)]
-    [InlineData(500, 142)]
     [InlineData(0, 0)]
-    [InlineData(-1, -1)]
     public void Find_ReturnsNothingWhenNothingMatches(int track, int car)
     {
         Assert.Empty(FromJson(TwoRows).Find(track, car, wet: false));

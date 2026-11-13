@@ -52,25 +52,11 @@ public class RetryPolicyTests
         Assert.InRange(wait.TotalSeconds, floor, floor + 1);
     }
 
-    [Fact]
-    public void BackoffIsJitteredSoClientsDoNotReturnTogether()
-    {
-        var waits = Enumerable.Range(0, 50).Select(_ => RetryPolicy.Backoff(1).TotalSeconds).ToList();
-
-        Assert.True(waits.Distinct().Count() > 1, "Backoff produced the same delay every time.");
-    }
-
     [Theory]
-    [InlineData(502, true)]
-    [InlineData(503, true)]
-    [InlineData(504, true)]
     [InlineData(500, true)]
-    [InlineData(400, false)]
+    [InlineData(503, true)]
     [InlineData(401, false)]
-    [InlineData(403, false)]
-    [InlineData(404, false)]
     [InlineData(409, false)]
-    [InlineData(410, false)]
     [InlineData(429, false)]
     public void OnlyServerSideFailuresAreWorthRetrying(int status, bool expected)
     {

@@ -80,6 +80,7 @@ public partial class MainWindow : Window
         Left = _settings.Left;
         Top = _settings.Top;
         _shown = !_settings.StartMinimized;
+        ApplyScale();
 
         _bannerTimer.Tick += (_, _) => HideBanner();
         _loginTimer.Tick += (_, _) => OnLoginTick();
@@ -224,6 +225,7 @@ public partial class MainWindow : Window
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add(_lockItem);
         menu.Items.Add(Option("Show overlay", _shown, item => { _shown = item.Checked; ApplyVisibility(); }));
+        menu.Items.Add(SizeMenu());
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add(Option("Show with iRacing only", _settings.IRacingOnly, item => { _settings.IRacingOnly = item.Checked; _settings.Save(); ApplyVisibility(); }));
         menu.Items.Add(Option("Start minimized", _settings.StartMinimized, item => { _settings.StartMinimized = item.Checked; _settings.Save(); }));
@@ -254,6 +256,42 @@ public partial class MainWindow : Window
         var item = new Forms.ToolStripMenuItem(text) { CheckOnClick = true, Checked = on };
         item.Click += (_, _) => clicked(item);
         return item;
+    }
+
+    private static readonly double[] Scales = [1, 1.25, 1.5, 1.75, 2];
+
+    /// <summary>Builds the Panel size submenu, one ticked entry per scale.</summary>
+    /// <returns>The submenu.</returns>
+    private Forms.ToolStripMenuItem SizeMenu()
+    {
+        var size = new Forms.ToolStripMenuItem("Panel size");
+
+        foreach (var scale in Scales)
+        {
+            size.DropDownItems.Add(new Forms.ToolStripMenuItem($"{scale * 100:0}%", null, (_, _) =>
+            {
+                _settings.Scale = scale;
+                _settings.Save();
+                ApplyScale();
+                foreach (Forms.ToolStripMenuItem item in size.DropDownItems) item.Checked = (double)item.Tag! == scale;
+            })
+            {
+                Tag = scale,
+                Checked = scale == _settings.Scale,
+            });
+        }
+
+        return size;
+    }
+
+    /// <summary>
+    /// Scales every layer by the saved size, for low-vision drivers and 4K or triple screens. The
+    /// window sizes to its content, so it grows with it, down and right from where it was placed.
+    /// </summary>
+    private void ApplyScale()
+    {
+        var scale = Math.Clamp(_settings.Scale, Scales[0], Scales[^1]);
+        Root.LayoutTransform = new ScaleTransform(scale, scale);
     }
 
     /// <summary>Adds or removes the Run entry to match the tick, putting the tick back if Windows refuses.</summary>

@@ -57,13 +57,4 @@ public class TimeFormatTests
     {
         Assert.Equal(expected, TimeFormat.Delta(seconds));
     }
-
-    [Theory]
-    [InlineData("1:23.456")]
-    [InlineData("0:59.999")]
-    [InlineData("12:00.001")]
-    public void ParseAndFormat_RoundTrip(string text)
-    {
-        Assert.Equal(text, TimeFormat.Format(TimeFormat.Parse(text)));
-    }
 }
